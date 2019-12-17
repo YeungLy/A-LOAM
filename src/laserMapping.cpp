@@ -236,6 +236,8 @@ void process()
 			!fullResBuf.empty() && !odometryBuf.empty())
 		{
 			mBuf.lock();
+			//the frequency of odometry is higher than cornerLast
+			//ensure odometryBUf and cornerLast and surfLast and fullRes are synchronized
 			while (!odometryBuf.empty() && odometryBuf.front()->header.stamp.toSec() < cornerLastBuf.front()->header.stamp.toSec())
 				odometryBuf.pop();
 			if (odometryBuf.empty())
@@ -309,7 +311,24 @@ void process()
 			transformAssociateToMap();
 
 			TicToc t_shift;
-			int centerCubeI = int((t_w_curr.x() + 25.0) / 50.0) + laserCloudCenWidth;
+			/*
+			t_w_curr, means current point cloud original point at world frame.
+			if it is (-25, -25, -25)
+			then centerCubeI  means current point cloud center at X axis at which cube = 10, 10th (index:[0, 20])
+			     centerCubeJ  means current point cloud center at Y axis at which cube = 10, 10th
+                 centerCubeK  means current point cloud center at Z axis at which cube = 5, 5th
+            laserCloudWidth:  total small cube numbers at X axis: 21 cubes, each cube is 10cm
+            laserCloudHeight: total small cube numbers at Y axis: 21 cubes, each cube is 10cm
+            laserCloudDepth:  total small cube numbers at Z axis: 11 cubes, each cube is 10cm
+            the whole big cube is 20m*20m*10m(?),  all points at map point cloud should be in this cube.
+                why 20? maybe : the map cube is 10*10*10, when adding new point cloud,
+                it can be extend at most 10m. but only at X axis or Y axis, no extension at Z axis..
+                //???? or each cube is 5*5*10 (cm) so that the whole big cube is 10*10*10 (m) ?
+
+			 */
+
+
+            int centerCubeI = int((t_w_curr.x() + 25.0) / 50.0) + laserCloudCenWidth;
 			int centerCubeJ = int((t_w_curr.y() + 25.0) / 50.0) + laserCloudCenHeight;
 			int centerCubeK = int((t_w_curr.z() + 25.0) / 50.0) + laserCloudCenDepth;
 
@@ -321,11 +340,11 @@ void process()
 				centerCubeK--;
 
 			while (centerCubeI < 3)
-			{
+			{//if current point cloud at the left boundary of map, move the map point towards center
 				for (int j = 0; j < laserCloudHeight; j++)
 				{
 					for (int k = 0; k < laserCloudDepth; k++)
-					{ 
+					{ //at width: all points move right (0, 1, 2, ..., width) -> (width, 0, 1, ...,width-1)
 						int i = laserCloudWidth - 1;
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k]; 
@@ -348,15 +367,17 @@ void process()
 				}
 
 				centerCubeI++;
+				//center cube index at map also move???? because the whole map is move right, the original center points at map
+				  //were moved too..
 				laserCloudCenWidth++;
 			}
 
 			while (centerCubeI >= laserCloudWidth - 3)
-			{ 
+			{//or current point cloud at the right boundary of map, move the map point towards center
 				for (int j = 0; j < laserCloudHeight; j++)
 				{
 					for (int k = 0; k < laserCloudDepth; k++)
-					{
+					{//at width: all points move left (0, 1, ..., width-1, width) -> (1, 2, ..., width, 0)
 						int i = 0;
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
@@ -383,11 +404,11 @@ void process()
 			}
 
 			while (centerCubeJ < 3)
-			{
+			{//the same on Y axis
 				for (int i = 0; i < laserCloudWidth; i++)
 				{
 					for (int k = 0; k < laserCloudDepth; k++)
-					{
+					{//at height: all points move right
 						int j = laserCloudHeight - 1;
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
@@ -509,6 +530,7 @@ void process()
 			int laserCloudValidNum = 0;
 			int laserCloudSurroundNum = 0;
 
+			//select valid surrounding points indices from current point cloud
 			for (int i = centerCubeI - 2; i <= centerCubeI + 2; i++)
 			{
 				for (int j = centerCubeJ - 2; j <= centerCubeJ + 2; j++)
@@ -576,14 +598,17 @@ void process()
 
 					for (int i = 0; i < laserCloudCornerStackNum; i++)
 					{
+					    //current frame point : pointOri
 						pointOri = laserCloudCornerStack->points[i];
 						//double sqrtDis = pointOri.x * pointOri.x + pointOri.y * pointOri.y + pointOri.z * pointOri.z;
 						pointAssociateToMap(&pointOri, &pointSel);
 						kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis); 
 
 						if (pointSearchSqDis[4] < 1.0)
-						{ 
+						{ //max distance is under the threshold
+
 							std::vector<Eigen::Vector3d> nearCorners;
+							//center is the geometric center of surronding points
 							Eigen::Vector3d center(0, 0, 0);
 							for (int j = 0; j < 5; j++)
 							{
@@ -609,7 +634,7 @@ void process()
 							Eigen::Vector3d unit_direction = saes.eigenvectors().col(2);
 							Eigen::Vector3d curr_point(pointOri.x, pointOri.y, pointOri.z);
 							if (saes.eigenvalues()[2] > 3 * saes.eigenvalues()[1])
-							{ 
+							{ //max eigenvalue is big enough than other eigenvalues
 								Eigen::Vector3d point_on_line = center;
 								Eigen::Vector3d point_a, point_b;
 								point_a = 0.1 * unit_direction + point_on_line;

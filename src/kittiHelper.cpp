@@ -85,6 +85,7 @@ int main(int argc, char** argv)
     ros::Rate r(10.0 / publish_delay);
     while (std::getline(timestamp_file, line) && ros::ok())
     {
+        std::cout << "process at line num : " << line_num;
         float timestamp = stof(line);
         std::stringstream left_image_path, right_image_path;
         left_image_path << dataset_folder << "sequences/" + sequence_number + "/image_0/" << std::setfill('0') << std::setw(6) << line_num << ".png";
@@ -129,7 +130,8 @@ int main(int argc, char** argv)
 
         // read lidar point cloud
         std::stringstream lidar_data_path;
-        lidar_data_path << dataset_folder << "velodyne/sequences/" + sequence_number + "/velodyne/" 
+        //lidar_data_path << dataset_folder << "velodyne/sequences/" + sequence_number + "/velodyne/"
+        lidar_data_path << dataset_folder << "sequences/" + sequence_number + "/velodyne/"
                         << std::setfill('0') << std::setw(6) << line_num << ".bin";
         std::vector<float> lidar_data = read_lidar_data(lidar_data_path.str());
         std::cout << "totally " << lidar_data.size() / 4.0 << " points in this lidar frame \n";
@@ -170,7 +172,7 @@ int main(int argc, char** argv)
             bag_out.write("/odometry_gt", ros::Time::now(), odomGT);
         }
 
-        line_num ++;
+        line_num++;
         r.sleep();
     }
     bag_out.close();

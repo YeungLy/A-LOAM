@@ -57,7 +57,7 @@
 #include "lidarFactor.hpp"
 
 #define DISTORTION 0
-
+//
 
 int corner_correspondence = 0, plane_correspondence = 0;
 
@@ -240,6 +240,7 @@ int main(int argc, char **argv)
                 ROS_BREAK();
             }
 
+            //加锁，从缓冲区中取出一次msg，解锁
             mBuf.lock();
             cornerPointsSharp->clear();
             pcl::fromROSMsg(*cornerSharpBuf.front(), *cornerPointsSharp);
@@ -287,9 +288,10 @@ int main(int argc, char **argv)
                     ceres::Problem::Options problem_options;
 
                     ceres::Problem problem(problem_options);
+                    //Quaternion params should satisfy some rule?
                     problem.AddParameterBlock(para_q, 4, q_parameterization);
                     problem.AddParameterBlock(para_t, 3);
-
+ 
                     pcl::PointXYZI pointSel;
                     std::vector<int> pointSearchInd;
                     std::vector<float> pointSearchSqDis;
@@ -298,12 +300,15 @@ int main(int argc, char **argv)
                     // find correspondence for corner features
                     for (int i = 0; i < cornerPointsSharpNum; ++i)
                     {
+                        //current frame : points[i], transformed to curr frame's start: pointSel
                         TransformToStart(&(cornerPointsSharp->points[i]), &pointSel);
+                        //search nearest to pointSel at last frame corner points(already transformed to last frame's end),
                         kdtreeCornerLast->nearestKSearch(pointSel, 1, pointSearchInd, pointSearchSqDis);
 
                         int closestPointInd = -1, minPointInd2 = -1;
                         if (pointSearchSqDis[0] < DISTANCE_SQ_THRESHOLD)
-                        {
+                        {//find the point close enough at last frame
+
                             closestPointInd = pointSearchInd[0];
                             int closestPointScanID = int(laserCloudCornerLast->points[closestPointInd].intensity);
 
@@ -361,7 +366,7 @@ int main(int argc, char **argv)
                             }
                         }
                         if (minPointInd2 >= 0) // both closestPointInd and minPointInd2 is valid
-                        {
+                        {//can draw the corresponding line..
                             Eigen::Vector3d curr_point(cornerPointsSharp->points[i].x,
                                                        cornerPointsSharp->points[i].y,
                                                        cornerPointsSharp->points[i].z);
@@ -412,6 +417,7 @@ int main(int argc, char **argv)
                                                     (laserCloudSurfLast->points[j].z - pointSel.z) *
                                                         (laserCloudSurfLast->points[j].z - pointSel.z);
 
+
                                 // if in the same or lower scan line
                                 if (int(laserCloudSurfLast->points[j].intensity) <= closestPointScanID && pointSqDis < minPointSqDis2)
                                 {
@@ -455,7 +461,7 @@ int main(int argc, char **argv)
                             }
 
                             if (minPointInd2 >= 0 && minPointInd3 >= 0)
-                            {
+                            {//find 2 nearer points with 1 nearest point , can draw the corresponding plane..
 
                                 Eigen::Vector3d curr_point(surfPointsFlat->points[i].x,
                                                             surfPointsFlat->points[i].y,
@@ -501,6 +507,9 @@ int main(int argc, char **argv)
                 }
                 printf("optimization twice time %f \n", t_opt.toc());
 
+                //old q_w_curr is actually from last to world
+                //update q_w_curr by  q_last_curr (from curr to last)
+                //new q_w_curr is from curr to world
                 t_w_curr = t_w_curr + q_w_curr * t_last_curr;
                 q_w_curr = q_w_curr * q_last_curr;
             }
@@ -552,7 +561,7 @@ int main(int argc, char **argv)
             }
 
             pcl::PointCloud<PointType>::Ptr laserCloudTemp = cornerPointsLessSharp;
-            cornerPointsLessSharp = laserCloudCornerLast;
+            cornerPointsLessSharp = laserCloudCornerLast;  //? why not just updating last..
             laserCloudCornerLast = laserCloudTemp;
 
             laserCloudTemp = surfPointsLessFlat;

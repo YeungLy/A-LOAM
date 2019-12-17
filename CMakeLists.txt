@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(aloam_velodyne)
+project(obj_aloam)
 
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "-std=c++11")
@@ -37,7 +37,7 @@ catkin_package(
 )
 
 
-add_executable(ascanRegistration src/scanRegistration.cpp)
+add_executable(ascanRegistration src/scanRegistration.cpp.bak)
 target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(alaserOdometry src/laserOdometry.cpp)
@@ -48,6 +48,9 @@ target_link_libraries(alaserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES
 
 add_executable(kittiHelper src/kittiHelper.cpp)
 target_link_libraries(kittiHelper ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+
+add_executable(kittiHelperRaw src/kittiHelperRaw.cpp)
+target_link_libraries(kittiHelperRaw ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 
 
