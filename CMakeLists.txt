@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   cv_bridge
   tf
+  jsk_recognition_msgs
 )
 
 #find_package(Eigen3 REQUIRED)
@@ -23,21 +24,25 @@ find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Ceres REQUIRED)
 
+find_package(Boost REQUIRED COMPONENTS
+        serialization)
+
 include_directories(
   include
 	${catkin_INCLUDE_DIRS} 
 	${PCL_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS})
+  ${OpenCV_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS})
 
 catkin_package(
-  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs
+  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs jsk_recognition_msgs
   DEPENDS EIGEN3 PCL 
   INCLUDE_DIRS include
 )
 
 
-add_executable(ascanRegistration src/scanRegistration.cpp.bak)
+add_executable(ascanRegistration src/scanRegistration.cpp)
 target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(alaserOdometry src/laserOdometry.cpp)
@@ -51,6 +56,10 @@ target_link_libraries(kittiHelper ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_
 
 add_executable(kittiHelperRaw src/kittiHelperRaw.cpp)
 target_link_libraries(kittiHelperRaw ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+
+add_executable(loadTracklet src/loadTracklet.cpp)
+target_link_libraries(loadTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${Boost_LIBRARIES})
+
 
 
 

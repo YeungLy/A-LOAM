@@ -21,6 +21,11 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <jsk_recognition_msgs/BoundingBox.h>
+#include <jsk_recognition_msgs/BoundingBoxArray.h>
+ 
+#include "tracklets.h"
+
 
 std::vector<float> read_lidar_data(const std::string lidar_data_path)
 {
@@ -108,14 +113,14 @@ double convertStrDatetimetoTimestamp(const std::string & s)
     }
     std::time_t timestamp = timegm(&t);
     double time_ms = timestamp*1.0 + ms;
-    //std::cout << "timestamp: " << timestamp << " ms: " << ms << std::endl;
-    //std::cout << " return: " << std::setiosflags(std::ios::showpoint|std::ios::fixed) << std::setprecision(12) << time_ms << std::endl;
     return time_ms;
 }
 
+
+
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "kitti_helper");
+    ros::init(argc, argv, "kitti_helper_raw");
     ros::NodeHandle n("~");
     std::string dataset_folder, output_bag_file;
     int num_frame = 5;
@@ -145,6 +150,15 @@ int main(int argc, char** argv)
     nav_msgs::Path pathGT;
     pathGT.header.frame_id = "/camera_init";
 
+    ros::Publisher pubTracksGT = n.advertise<jsk_recognition_msgs::BoundingBoxArray> ("/tracks_gt", 5);
+    jsk_recognition_msgs::BoundingBoxArray tracksGT;
+    tracksGT.header.frame_id = "/camera_init";
+
+    Tracklets tracklets;
+    std::string tracklets_path = dataset_folder + "tracklet_labels.xml";
+    if (!tracklets.loadFromFile(tracklets_path))
+        std::cout << "Fail to load tracklets from : " << tracklets_path << std::endl;
+
     std::string timestamp_path = "velodyne_points/timestamps.txt";
     std::ifstream timestamp_file(dataset_folder + timestamp_path, std::ifstream::in);
 
@@ -164,7 +178,7 @@ int main(int argc, char** argv)
     T_cam0_velo = R_rect_00 * T_cam0_velo;
 
     Eigen::Matrix<double, 4, 4> T_cam0_imu = T_cam0_velo * T_velo_imu;
-    std::cout << "calib: \nT_velo_imu:\n" << T_velo_imu << "\nT_cam0_velo\n" << T_cam0_velo << "\nT_cam0_imu\n" << T_cam0_imu << std::endl;
+    //std::cout << "calib: \nT_velo_imu:\n" << T_velo_imu << "\nT_cam0_velo\n" << T_cam0_velo << "\nT_cam0_imu\n" << T_cam0_imu << std::endl;
 
     rosbag::Bag bag_out;
     if (to_bag)
@@ -174,15 +188,16 @@ int main(int argc, char** argv)
     R_transform << 0, 0, 1, -1, 0, 0, 0, -1, 0;
     Eigen::Quaterniond q_transform(R_transform);
 
+       //set some initial value.
+    Eigen::Matrix<double, 4, 4> pose_init_inv;
+    double scale_init = 0;
+    double time_init = 0.0;
+    
     std::string line;
     std::size_t line_num = 0;
 
     ros::Rate r(10.0 / publish_delay);
-
-    //set some initial value.
-    Eigen::Matrix<double, 4, 4> pose_init_inv;
-    double scale_init = 0;
-    double time_init = 0.0;
+    
     while (std::getline(timestamp_file, line) && ros::ok())
     {
         std::cout << "process at line num : " << line_num << std::endl;
@@ -252,6 +267,41 @@ int main(int argc, char** argv)
         pathGT.poses.push_back(poseGT);
         pubPathGT.publish(pathGT);
 
+        // read tracklets
+        
+        int frame_number = line_num;
+        int num_tracks = tracklets.numberOfTracklets();
+        tracksGT.header.stamp = ros::Time().fromSec(timestamp);
+        Tracklets::tPose * obj_pose = new Tracklets::tPose();
+        for (int id = 0; id < num_tracks; id++)
+        {
+            if (!tracklets.isActive(id, frame_number))
+                continue;
+            Tracklets::tTracklet * obj = tracklets.getTracklet(id);
+            tracklets.getPose(id, frame_number, obj_pose);
+
+            Eigen::AngleAxisd rx(obj_pose->rx, Eigen::Vector3d::UnitX());
+            Eigen::AngleAxisd ry(obj_pose->ry, Eigen::Vector3d::UnitY());
+            Eigen::AngleAxisd rz(obj_pose->rz, Eigen::Vector3d::UnitZ());
+            Eigen::Quaterniond q = rz*ry*rz;
+            
+            jsk_recognition_msgs::BoundingBox bbox;
+            bbox.header = tracksGT.header;
+            bbox.pose.orientation.x = q.x(); 
+            bbox.pose.orientation.y = q.y(); 
+            bbox.pose.orientation.w = q.z(); 
+            bbox.pose.orientation.w = q.w(); 
+            bbox.pose.position.x = obj_pose->tx; 
+            bbox.pose.position.y = obj_pose->ty;
+            bbox.pose.position.z = obj_pose->tz;
+            bbox.dimensions.x = obj->l;
+            bbox.dimensions.y = obj->w;
+            bbox.dimensions.z = obj->h;
+            bbox.label = id;
+            tracksGT.boxes.push_back(bbox);
+        }
+        pubTracksGT.publish(tracksGT);
+
         // read lidar point cloud
         std::stringstream lidar_data_path;
         lidar_data_path << dataset_folder << "velodyne_points/data/"
@@ -286,6 +336,8 @@ int main(int argc, char** argv)
         pub_image_left.publish(image_left_msg);
         pub_image_right.publish(image_right_msg);
 
+
+
         if (to_bag)
         {
             bag_out.write("/image_left", ros::Time::now(), image_left_msg);
@@ -293,6 +345,7 @@ int main(int argc, char** argv)
             bag_out.write("/velodyne_points", ros::Time::now(), laser_cloud_msg);
             bag_out.write("/path_gt", ros::Time::now(), pathGT);
             bag_out.write("/odometry_gt", ros::Time::now(), odomGT);
+            bag_out.write("/tracks_gt", ros::Time::now(), tracksGT);
         }
 
         line_num++;
