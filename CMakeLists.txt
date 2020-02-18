@@ -42,6 +42,13 @@ catkin_package(
 )
 
 
+add_executable(aSegment src/segmentCloud.cpp)
+target_link_libraries(aSegment ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable(aTracklets src/object.cpp)
+target_link_libraries(aTracklets ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES})
+
+
 add_executable(ascanRegistration src/scanRegistration.cpp)
 target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
@@ -51,15 +58,17 @@ target_link_libraries(alaserOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERE
 add_executable(alaserMapping src/laserMapping.cpp)
 target_link_libraries(alaserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES})
 
-add_executable(kittiHelper src/kittiHelper.cpp)
-target_link_libraries(kittiHelper ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+#add_executable(kittiHelper src/kittiHelper.cpp)
+#target_link_libraries(kittiHelper ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 add_executable(kittiHelperRaw src/kittiHelperRaw.cpp)
 target_link_libraries(kittiHelperRaw ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
-add_executable(loadTracklet src/loadTracklet.cpp)
-target_link_libraries(loadTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${Boost_LIBRARIES})
+#add_executable(pubTracklet src/pubTracklet.cpp)
+#target_link_libraries(pubTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${Boost_LIBRARIES})
 
+#add_executable(subTracklet src/subTracklet.cpp)
+#target_link_libraries(subTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 
 

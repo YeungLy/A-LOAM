@@ -1,0 +1,12 @@
+<launch>
+
+    <node pkg="obj_aloam" type="aSegment" name="aSegment" output="screen" />
+
+    <arg name="rviz" default="true" />
+    <group if="$(arg rviz)">
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find obj_aloam)/rviz_cfg/segment.rviz" />
+    </group>
+    <!-->
+    <-->
+
+</launch>

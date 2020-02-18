@@ -286,7 +286,6 @@ int main(int argc, char **argv)
                     ceres::LocalParameterization *q_parameterization =
                         new ceres::EigenQuaternionParameterization();
                     ceres::Problem::Options problem_options;
-
                     ceres::Problem problem(problem_options);
                     //Quaternion params should satisfy some rule?
                     problem.AddParameterBlock(para_q, 4, q_parameterization);
@@ -506,6 +505,10 @@ int main(int argc, char **argv)
                     printf("solver time %f ms \n", t_solver.toc());
                 }
                 printf("optimization twice time %f \n", t_opt.toc());
+                //already finish twice optimization.
+                //why optimizing twice, instead of adding iteration number at one optimization:
+                //beacause each optimization will find correspondence points based on last time optimized result.
+                //if only optimize once, then the correspondence wont change, only the optimized parameters changing.
 
                 //old q_w_curr is actually from last to world
                 //update q_w_curr by  q_last_curr (from curr to last)
@@ -597,6 +600,7 @@ int main(int argc, char **argv)
                 laserCloudFullRes3.header.stamp = ros::Time().fromSec(timeSurfPointsLessFlat);
                 laserCloudFullRes3.header.frame_id = "/camera";
                 pubLaserCloudFullRes.publish(laserCloudFullRes3);
+               
             }
             printf("publication time %f ms \n", t_pub.toc());
             printf("whole laserOdometry time %f ms \n \n", t_whole.toc());

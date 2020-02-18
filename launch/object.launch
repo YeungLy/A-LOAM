@@ -1,0 +1,47 @@
+<launch>
+    
+    <param name="scan_line" type="int" value="64" />
+
+    <!-- if 1, do mapping 10 Hz, if 2, do mapping 5 Hz. Suggest to use 1, it will adjust frequence automaticlly -->
+    <param name="mapping_skip_frame" type="int" value="1" />
+
+    <!-- remove too closed points -->
+    <param name="minimum_range" type="double" value="5"/>
+
+    <param name="has_gt_objects" type="bool" value="false"/>
+
+    <param name="mapping_line_resolution" type="double" value="0.4"/>
+    <param name="mapping_plane_resolution" type="double" value="0.8"/>
+
+
+
+      <!-- 
+      <remap from="object_boxes" to="tracks_gt" /> 
+      -->
+
+     <node pkg="obj_aloam" type="aSegment" name="aSegment" output="screen"> 
+     </node>
+
+     <node pkg="obj_aloam" type="aTracklets" name="aTracklets" output="screen">
+     </node>
+
+     <node pkg="obj_aloam" type="ascanRegistration" name="ascanRegistration" output="log" >
+
+     </node>
+
+     <node pkg="obj_aloam" type="alaserOdometry" name="alaserOdometry" output="screen">
+    
+     </node>
+
+     <node pkg="obj_aloam" type="alaserMapping" name="alaserMapping" output="screen" />
+
+
+
+    <arg name="rviz" default="true" />
+    <group if="$(arg rviz)">
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find obj_aloam)/rviz_cfg/obj_aloam_test.rviz" />
+    </group>
+     <!--
+     -->
+
+</launch>

@@ -111,143 +111,9 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
     cloud_out.is_dense = true;
 }
 
-template <typename PointT>
-bool IsInObject(const pcl::PointT point, Eigen::Matrix<double, 3, 8> object)
-{//8 corners stands for an object?
-
-    if (!(point.z >= object(2, 0) && point.z <= object(2, 4)))
-        return false;
-    double xmax, ymax, xmin, ymin;
-    xmax = object.row(0).maxCoeff();
-    xmin = object.row(0).minCoeff();
-    ymax = object.row(1).maxCoeff();
-    ymin = object.row(1).minCoeff();
-    std::cout << "xmin " << xmin << " xmax " << xmax << " ymin " << ymin << " ymax " << ymax << std::endl;
-    if (point.x >= xmin && point.x <= xmax && point.y >= ymin && point.y <= ymax)
-        return true;
-    else
-        return false;
-    /*
-    Eigen::Matrix<double, 2, 1> P{point.x, point.y};
-    double a = (object(0, 1) - object(0, 0)) * (P(1, 0) - object(1, 0)) - (object(1, 1) - object(1, 0)) * (P(0, 0) - object(0, 0));
-    double b = (object(0, 2) - object(0, 1)) * (P(1, 0) - object(1, 1)) - (object(1, 2) - object(1, 1)) * (P(0, 0) - object(0, 1));
-    double c = (object(0, 3) - object(0, 2)) * (P(1, 0) - object(1, 2)) - (object(1, 3) - object(1, 2)) * (P(0, 0) - object(0, 2));
-    double d = (object(0, 0) - object(0, 3)) * (P(1, 0) - object(1, 3)) - (object(1, 0) - object(1, 3)) * (P(0, 0) - object(0, 3));
-    
-
-
-    if ((a > 0 && b > 0 && c > 0 && d > 0 ) || (a < 0 && b < 0 && c < 0 && d <0 ))
-        return true;
-    else
-        return false;
-    */
-
-}
-Eigen::MatrixXd computeBbox3dCorners(const std::vector<double> object)
-{
-    //object: (x, y, z, h, w, l, rz), l <-> x, h <-> z, w <-> y 
-
-    Eigen::MatrixXd bbox3d_8corner(3, 8);
-    double l = object[3];
-    double h = object[4];
-    double w = object[5]];
-
-    bbox3d_8corner << l/2., l/2., -l/2., -l/2., l/2., l/2., -l/2., -l/2.,
-                      w/2., -w/2., -w/2., w/2., w/2., -w/2., -w/2., w/2.,
-                      0., 0., 0., 0., -h, -h, -h, -h;
-
-    double rx = 0.0, ry = 0.0, rz = object[6];
-    double tx = object[0], ty = object[1], tz = object[2];
-    Eigen::AngleAxisd rollAngle(rz, Eigen::Vector3d::UnitZ()); 
-    Eigen::AngleAxisd pitchAngle(rx, Eigen::Vector3d::UnitX()); 
-    Eigen::AngleAxisd yawAngle(ry, Eigen::Vector3d::UnitY()); 
-
-    Eigen::Matrix3d rotateMat;
-    rotateMat = yawAngle * pitchAngle * rollAngle;
-
-    Eigen::Vector3d translation(tx, ty, tz);
-    Eigen::MatrixXd transMat(3, 8);
-    transMat << translation, translation, translation,
-                translation, translation ,translation,
-                translation, translation;
-    bbox3d_8corner = transMat + rotateMat * bbox3d_8corner;
-
-    return bbox3d_8corner;
-}
-
-
- 
-
-template <typename PointT>
-std::vector<pcl::PointCloud<PointT> segmentPointCloud(const pcl::PointCloud<PointT> &cloud_in,
-        const std::vector<Eigen::Matrix<double, 3, 8>> objects)
-{
-    //segment point cloud to Background \ Object1 \ Object2 \ ...
-
-    double thres = 1.5; //enlarge 1.5m to origin objects bbox range.
-    std::vector<pcl::PointCloud<PointT>> cloud_groups;
-    for(int i = 0; i < objects.size() + 1; i++)
-    {
-        pcl::PointCloud<PointT> cloud;
-        cloud_groups.push_back(cloud);
-    }
-    for (size_t pi = 0; pi < cloud_in.points.size(); pi++)
-    {
-        bool isBG = true;
-        for(size_t oi = 0; oi < objects.size(); oi++)
-        {
-            if (IsInObject(cloud_in.points[pi], objects[oi]))
-            {
-                cloud_groups[oi+1].push_back(cloud_in.points[pi]);
-                isBG = false;
-                break;
-            }
-        }
-        if (isBG)
-        {
-            cloud_groups[0].push_back(cloud_in.points[pi]);
-        }
-    }
-    for(int i = 0; i < objects.size() + 1; i++)
-    {
-        cloud_groups[i].header = cloud_in.header;
-        cloud_groups[i].height = 1;
-        cloud_groups[i].width = static_cast<uint32_t>(cloud_groups[i].points.size());
-        cloud_groups[i].is_dense=true;
-    }
-    return cloud_groups;
-}
-
-void segmentHandler(const sensor_mags::PointCloud2ConstPtr &laserCloudMsg)
-{
-    if (!systemInited)
-    {
-        systemInitCount++;
-        if (systemInitCount >= systemDelay)
-        {
-            systemInited = true;
-        }
-        else
-            return;
-    }
-
-    pcl::PointCloud<pcl::PointXYZ> laserCloudIn;
-    pcl::fromROSMsg(*laserCloudMsg, laserCloudIn);
-    std::vector<int> indices;
-
-    pcl::removeNaNFromPointCloud(laserCloudIn, laserCloudIn, indices);
-    removeClosedPointCloud(laserCloudIn, laserCloudIn, MINIMUM_RANGE);
-
-    std::vector<Eigen::Matrix<double, 7, 1>> objects;
-    
-    //Eigen::Matrix<double, 3, 8> object_8corners;
-
-    objects.push_back(object_8corners);
-    std::vector<pcl::PointCloud<PointT>> cloud_groups = segmentPointCloud(laserCloudIn, objects);
-}
-
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 {
+    ROS_INFO("subscribing msg at scanRegistration!");
     if (!systemInited)
     {
         systemInitCount++;
@@ -632,7 +498,9 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
+    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points_bg", 100, laserCloudHandler);
+    // original:
+    // ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
 
     pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
 
