@@ -52,6 +52,7 @@ class TrackletManager
     void UpdateTracklet(std::vector<DetectedBox> curr_dets);
     void Association(std::vector<DetectedBox> curr_dets);
     void AddTracklet(DetectedBox first_box, int start_frame);
+    void DelTracklet(uint32_t target_id);
     
     //if add or if delete?
     //member variable 
