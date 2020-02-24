@@ -420,7 +420,7 @@ int main(int argc, char **argv)
                             pubObjectsPathGTDict[i] = pubObjectPathGT;
                         }
                     }
-                    ROS_INFO_STREAM("Initializate tracklets number " << pubObjectsOdomDict.size());
+                    ROS_INFO_STREAM("Initialize tracklets number " << pubObjectsOdomDict.size());
                 } 
             }
             else 
