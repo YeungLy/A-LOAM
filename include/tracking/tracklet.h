@@ -9,9 +9,9 @@
 #include <vector>
 
 struct DetectedBox{
-    double x_, y_, z_;
-    double l_, w_, h_;
-    double yaw_;
+    double x, y, z;
+    double l, w, h;
+    double yaw;
 };
         
 
@@ -21,25 +21,28 @@ class Tracklet
 
     Tracklet();
     Tracklet(const DetectedBox & det, const int & start_frame, const uint32_t & id);
-    
-    std::vector<DetectedBox> history_;   // (x, y, z, l, w, h, theta, )
+
+    //predict object at current frame's position
+    void predict();
+    //update the estimation of object at current frame by the detected box for this object.
+    void update(const DetectedBox & det);
+
+    const DetectedBox & GetLatestBox();
+
+    std::vector<DetectedBox> history_;   // (x, y, z, l, w, h, yaw)
     
     //first occur frame index
     int start_frame_;   
     //number of appear frames
     int duration_;      
-    // is this tracklet initialized or potential tracklet?
-    bool is_initialized_ = false; 
-    //keep appearing frame counts
-    uint32_t hit_count_ = 0;   
     //keep disappearing frame counts
     uint32_t miss_count_ = 0;  
+    bool matched_ = false;
 
     uint32_t id_;
-
-    std::vector<double> params_; //(vx, vy, vz) ?
+    //std::vector<double> params_; //(vx, vy, vz) ?
     KalmanFilter kf_;
-    
+     
 };
 
 class TrackletManager
@@ -49,17 +52,38 @@ class TrackletManager
   
     //association DetectedBoxs at current frame to existed tracklets
    //unmatched : assign the bool value to unmatch
-    void UpdateTracklet(std::vector<DetectedBox> curr_dets);
-    void MatchBoxToTracklet(std::vector<DetectedBox> curr_dets);
-    void MatchBoxToBox(std::vector<DetectedBox> curr_dets);
-    void AddTracklet(DetectedBox first_box, int start_frame);
+    TrackletManager();
+    
+    std::vector< std::vector<double> > CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes);
+    
+    void Update(const std::vector<DetectedBox> & curr_boxes);
+    void CheckNewbornObjects(const std::vector<DetectedBox> & curr_boxes);
 
-    void DelTracklet(uint32_t target_id);
+    std::map<uint32_t, DetectedBox> GetCurrentObjects();
+
+    void AddTracklet(const DetectedBox & first_box, const int & start_frame);
+    bool DelTracklet(const uint32_t & target_id);
     
     //member variable 
     std::vector<Tracklet> tracklets_;
-    std::vector<Tracklet> potential_tracklets_;
-    uint32_t count_;
+
+    /*
+    maybe new tracklet.. 
+        if its age(hit count) equals MIN_HIT_COUNT, then initialize a new tracklet.. 
+        else delete it once it was not matched at current frame.
+    */
+    std::vector<DetectedBox> newborn_objects_;
+    std::vector<uint32_t> newborn_objects_age_;
+
+    uint32_t tracklets_count_ = 0;
+    int frame_idx = 0;
+    
+    double MAX_DIST = 0.5; //?
+    double MAX_DIST_NEWBORN = 0.3;
+    uint32_t MAX_MISS_COUNT = 2;
+    uint32_t MIN_HIT_COUNT = 3;
+
+    HungarianAlgorithm matcher_;
 };
 
 
