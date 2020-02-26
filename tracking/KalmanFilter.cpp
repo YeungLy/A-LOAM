@@ -8,7 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "tracking/KalmanFilter.h"
+#include "KalmanFilter.h"
 
 KalmanFilter::KalmanFilter(
     double dt,

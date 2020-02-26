@@ -149,7 +149,10 @@ int main(int argc, char **argv)
                 DetectedBox box = it->second();
                 Eigen::Vector3d t_lidar_obj(box.x, box.y, box.z);
                 //w,x,y,z
-                Eigen::Quaterniond q_lidar_obj(cos(box.yaw/2), 0.0, sin(box.yaw/2), 0.0);
+                Eigen::AngleAxisd rz(box.yaw, Eigen::Vector3d::UnitZ());
+                Eigen::AngleAxisd rx(0.0, Eigen::Vector3d::UnitX());
+                Eigen::AngleAxisd ry(0.0, Eigen::Vector3d::UnitY());
+                Eigen::Quaterniond q_lidar_obj = rz*ry*rx;
                 Eigen::Quaterniond q_w_obj = q_w_lidar * q_lidar_obj;
                 Eigen::Vector3d t_w_obj = q_w_lidar * t_lidar_obj + t_w_lidar;
                 nav_msgs::Odometry objOdom;

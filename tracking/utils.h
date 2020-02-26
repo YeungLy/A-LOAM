@@ -8,7 +8,7 @@
 //IOU computation.. 
 //maybe matrix cooperation can use eigen
 
-std::vector< std::vector<double> > CalculateIoU3d(std::vector<double> iBoxes, std::vector<double> jBoxes)
+std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxes, std::vector<DetectedBox> jBoxes)
 {
     std::vector< std::vector<double> > dist;
     for (size_t i = 0; i < iBoxes.size(); ++i)
@@ -28,8 +28,16 @@ std::vector<DetectedBox> RosMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayCon
 {
 
     std::vector<DetectedBox> boxes;
-    for (size_t i = 0; i < boxesCurr->boxes.size(); ++i)
+    for (size_t i = 0; i < boxes_msg->boxes.size(); ++i)
     {
+        DetectedBox box;
+        box.x = boxes_msg->boxes[i].pose.position.x;
+        box.y = boxes_msg->boxes[i].pose.position.y;
+        box.z = boxes_msg->boxes[i].pose.position.z;
+        //box.yaw = boxes_msg->boxes[i].pose.orientation.
+        box.l = boxes_msg->boxes[i].dimensions.x;
+        box.w = boxes_msg->boxes[i].dimensions.y;
+        box.h = boxes_msg->boxes[i].dimensions.z;
 
     }
     return boxes;

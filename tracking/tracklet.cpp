@@ -1,7 +1,6 @@
 //trajectory and track manager
 #include "tracklet.h"
 #include "utils.h"
-#include <vector>
 #include <glog/logging.h>
 
 Tracklet::Tracklet(const DetectedBox & det, const int & start_frame, const uint32_t & id){
@@ -18,7 +17,7 @@ Tracklet::Tracklet(const DetectedBox & det, const int & start_frame, const uint3
     kf_.H = Eigen::MatrixXd::Zero(kf_.nz, kf_.nx);
     kf_.H.topLeftCorner(kf_.nz, kf_.nz) = Eigen::MatrixXd::Identity(kf_.nz, kf_.nz);
     kf_.P0 = Eigen::MatrixXd::Identity(kf_.nx, kf_.nx);
-    kf_.R = Eig en::MatrixXd::Identity(kf_.nz, kf_.nz);
+    kf_.R = Eigen::MatrixXd::Identity(kf_.nz, kf_.nz);
     kf_.Q = Eigen::MatrixXd::Identity(kf_.nx, kf_.nx);
 
     Eigen::VectorXd init_state(kf_.nx);
@@ -48,8 +47,8 @@ void Tracklet::update(const DetectedBox & det)
 {
     Eigen::VectorXd measurement(kf_.nz);
     measurement << det.x, det.y, det.z, det.l, det.w, det.h, det.yaw;
-    kf_.update(det);
-    size_t now = history.length() - 1;
+    kf_.update(measurement);
+    size_t now = history_.size() - 1;
     history_[now].x = kf_.x_hat(0);
     history_[now].y = kf_.x_hat(1);
     history_[now].z = kf_.x_hat(2);
@@ -67,8 +66,8 @@ const DetectedBox & Tracklet::GetLatestBox()
 
 void TrackletManager::AddTracklet(const DetectedBox & first_box, const int & start_frame)
 {
-    Tracklet track(first_box, start_frame, count_);
-    count_ += 1;
+    Tracklet track(first_box, start_frame, tracklets_count_);
+    tracklets_count_ += 1;
     tracklets_.push_back(track);
 }
 
@@ -153,7 +152,7 @@ void TrackletManager::Update(const std::vector<DetectedBox> & curr_boxes)
     //How to delete an element from vector during for loop of this vector?
     for (size_t i = 0; i < tracklets_.size(); ++i)
     {
-        if (!tracklets_[i].matched)
+        if (!tracklets_[i].matched_)
         {//maybe unmatched because of THRESHOLD or n_curr is smaller than n_pred.
             LOG(INFO) << "[Update]tracklet id: " << tracklets_[i].id_ << " is unmatched.";
             tracklets_[i].miss_count_++;
@@ -192,7 +191,7 @@ void TrackletManager::CheckNewbornObjects(const std::vector<DetectedBox> & curr_
 {
     if (newborn_objects_.size() == 0)
     {
-        newborn_objects_age.clear();
+        newborn_objects_age_.clear();
         for (size_t i = 0; i < curr_boxes.size(); ++i)
         {
             newborn_objects_.push_back(curr_boxes[i]);
