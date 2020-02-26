@@ -35,6 +35,8 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS})
 
+add_subdirectory(tracking)
+
 catkin_package(
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs jsk_recognition_msgs
   DEPENDS EIGEN3 PCL 
@@ -46,7 +48,7 @@ add_executable(aSegment src/segmentCloud.cpp)
 target_link_libraries(aSegment ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(aTracklets src/object.cpp)
-target_link_libraries(aTracklets ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES})
+target_link_libraries(aTracklets ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES} tracking)
 
 
 add_executable(ascanRegistration src/scanRegistration.cpp)

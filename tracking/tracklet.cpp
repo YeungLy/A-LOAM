@@ -93,8 +93,7 @@ bool TrackletManager::DelTracklet(const uint32_t & target_id)
 
 std::vector< std::vector<double> > CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes)
 {
-    
-
+    return CalculateIoU3d(iBoxes, jBoxes);
 }
    
 
