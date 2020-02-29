@@ -23,12 +23,14 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Ceres REQUIRED)
+find_package(glog)
 
 find_package(Boost REQUIRED COMPONENTS
         serialization)
 
 include_directories(
   include
+    ${PROJECT_SOURCE_DIR}/tracking
 	${catkin_INCLUDE_DIRS} 
 	${PCL_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}
@@ -47,8 +49,8 @@ catkin_package(
 add_executable(aSegment src/segmentCloud.cpp)
 target_link_libraries(aSegment ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable(aTracklets src/object.cpp)
-target_link_libraries(aTracklets ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES} tracking)
+add_executable(aTracklet src/object.cpp)
+target_link_libraries(aTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES} tracking glog)
 
 
 add_executable(ascanRegistration src/scanRegistration.cpp)

@@ -64,6 +64,20 @@ const DetectedBox & Tracklet::GetLatestBox()
     return history_[history_.size() - 1];
 }
 
+TrackletManager::TrackletManager()
+{
+
+    google::InitGoogleLogging("TrackletManager");
+    google::SetStderrLogging(google::GLOG_INFO);
+    LOG(INFO) << "Start logging..";
+    
+}
+TrackletManager::~TrackletManager()
+{
+    LOG(INFO) << "Shutdown logging..";
+    google::ShutdownGoogleLogging();
+
+}
 void TrackletManager::AddTracklet(const DetectedBox & first_box, const int & start_frame)
 {
     Tracklet track(first_box, start_frame, tracklets_count_);
@@ -90,8 +104,9 @@ bool TrackletManager::DelTracklet(const uint32_t & target_id)
 }
 
 
-std::vector< std::vector<double> > CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes)
+std::vector< std::vector<double> > TrackletManager::CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes)
 {
+
     return CalculateIoU3d(iBoxes, jBoxes);
 }
    
