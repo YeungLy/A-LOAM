@@ -71,8 +71,8 @@
 #include "ros/init.h"
 #include "ros/node_handle.h"
 #include "ros/rate.h"
-#include "tracking/tracklet.h"
-#include "tracking/utils.h"
+#include "tracklet.h"
+#include "utils.h"
 using std::atan2;
 using std::cos;
 using std::sin;
@@ -220,8 +220,8 @@ int main(int argc, char **argv)
             std::map<uint32_t, DetectedBox> objects = tracker.GetCurrentObjects();
             for (auto it = objects.begin(); it != objects.end(); ++it)
             {
-                uint32_t id = it->first();
-                DetectedBox box = it->second();
+                uint32_t id = it->first;
+                DetectedBox box = it->second;
                 Eigen::Vector3d t_lidar_obj(box.x, box.y, box.z);
                 //w,x,y,z
                 Eigen::Quaterniond q_lidar_obj(cos(box.yaw/2), 0.0, sin(box.yaw/2), 0.0);
@@ -229,7 +229,7 @@ int main(int argc, char **argv)
                 Eigen::Vector3d t_w_obj = q_w_lidar * t_lidar_obj + t_w_lidar;
                 nav_msgs::Odometry objOdom;
                 objOdom.header.frame_id = "/camera_init";
-                objOdom.header.stamp = ros::Time().fromeSec(timeObjectArray);
+                objOdom.header.stamp = ros::Time().fromSec(timeObjectArray);
                 objOdom.pose.pose.orientation.x = q_w_obj.x();
                 objOdom.pose.pose.orientation.y = q_w_obj.y();
                 objOdom.pose.pose.orientation.z = q_w_obj.z();
@@ -240,7 +240,7 @@ int main(int argc, char **argv)
                 
                 if (pubObjectsOdomDict.find(id) == pubObjectsOdomDict.end())
                 {
-                    ros::Publisher pubObjOdom = nh.advertise<nav_msgs::Odometry>("/obj_"+id+"_odom", 3);
+                    ros::Publisher pubObjOdom = nh.advertise<nav_msgs::Odometry>("/obj_"+std::to_string(id)+"_odom", 3);
                     pubObjectsOdomDict[id] = pubObjOdom;
                 }
                 pubObjectsOdomDict[id].publish(objOdom);        

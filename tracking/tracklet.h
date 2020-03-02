@@ -54,6 +54,7 @@ class TrackletManager
     //association DetectedBoxs at current frame to existed tracklets
    //unmatched : assign the bool value to unmatch
     TrackletManager();
+    ~TrackletManager();
     
     std::vector< std::vector<double> > CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes);
     
