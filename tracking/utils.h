@@ -12,20 +12,59 @@
 //IOU computation.. 
 //maybe matrix cooperation can use eigen
 
-std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxes, std::vector<DetectedBox> jBoxes)
+double eigen_vector2d_cross(const Eigen::Vector2d & a, const Eigen::Vector2d & b)
 {
-    std::vector< std::vector<double> > dist;
-    for (size_t i = 0; i < iBoxes.size(); ++i)
-    {
-        std::vector<double> dist_row;
-        for (size_t j = 0; j < jBoxes.size(); ++j)
-        {
-            
-            dist_row[j] = 1 - 0.02*i + 0.15*j;
-        }
-        dist.push_back(dist_row);
+    return a.x() * b.y() - a.y() * b.x();
+}
+
+
+struct Rectangle2D {
+
+    Eigen::MatrixXd corners;
+    Eigen::MatrixXd edges;
+
+    Rectangle2D(const Eigen::MatrixXd & crns) 
+    { 
+        corners = crns; 
+        Eigen::MatrixXd ecorners(2, 4);
+        ecorners.leftCols(1) = corners.rightCols(1);
+        ecorners.block(0, 1, 2, 3) = corners.topLeftCorners(2, 3);
+        edges = ecorners - corners;        
     }
-    return dist;
+    bool isInsidePoint(const Eigen::Vector2d & p) 
+    {
+        Eigen::Vector2d AP, BP, CP, DP;
+        AP = p - corners.col(0);
+        BP = p - corners.col(1);
+        CP = p - corners.col(2);
+        DP = p - corners.col(3);
+
+        return (eigen_vector2d_cross(edges.col(0), AP) * eigen_vector2d_cross(edges.col(2), CP) > 0) 
+                && (eigen_vector2d_cross(edges.col(1), BP) * eigen_vector2d_cross(edges.col(3), DP) > 0);
+    }
+    double getArea() 
+    {
+        return std::abs(eigen_vector2d_cross(edges.col(0), edges.col(1)));
+    }
+};
+
+
+
+//box3d to 8corners
+Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
+{
+    //8corners: (x,y,z), 3*8
+    Eigen::MatrixXd corners(3, 8);
+    corners << box.l / 2., -box.l / 2., -box.l / 2., box.l / 2., box.l / 2., -box.l / 2., -box.l / 2., box.l / 2.,
+                -box.w / 2., -box.w / 2., box.w /2., box.w / 2., -box.w / 2., -box.w / 2., box.w /2., box.w / 2.,
+                0, 0, 0, 0, box.h, box.h, box.h, box.h;
+
+    Eigen::Quaterniond q{std::cos(box.yaw/2.), 0.0, 0.0, std::sin(box.yaw/2.)};
+    Eigen::Vector3d t(box.x, box.y, box.z);
+    Eigen::MatrixXd t_mat(3, 8);
+    t_mat << t, t, t, t, t, t, t, t;
+    corners = corners * q + t_mat;
+    return corners;
 }
 
 std::vector<DetectedBox> RosMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayConstPtr boxes_msg)
@@ -47,71 +86,40 @@ std::vector<DetectedBox> RosMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayCon
     return boxes;
 }
 
-//box3d to 8corners
-Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
-{
-    //8corners: (x,y,z), 3*8
-    Eigen::MatrixXd corners(3, 8);
-    corners << box.l / 2., -box.l / 2., -box.l / 2., box.l / 2., box.l / 2., -box.l / 2., -box.l / 2., box.l / 2.,
-              -box.w / 2., -box.w / 2., box.w /2., box.w / 2., -box.w / 2., -box.w / 2., box.w /2., box.w / 2.,
-              0, 0, 0, 0, box.h, box.h, box.h, box.h;
-    
-    Eigen::Quaterniond q{std::cos(box.yaw/2.), 0.0, 0.0, std::sin(box.yaw/2.)};
-    Eigen::Vector3d t(box.x, box.y, box.z);
-    Eigen::MatrixXd t_mat(3, 8);
-    t_mat << t, t, t, t, t, t, t, t;
-    corners = corners * q + t_mat;
-    return corners;
-}
 
-double eigen_vector2d_cross(const Eigen::Vector2d & a, const Eigen::Vector2d & b)
+
+double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox)
 {
-    return a.x() * b.y() - a.y() * b.x();
-}
-double BoxIoUBev(const Eigen::MatrixXd & icorners, const Eigen::MatrixXd & jcorners)
-{
+    
     //icorners: 2*4, jcorners: 2*4, four 2D box corner points in clockwise.
     double iou;
-
-
-    std::vector<Eigen::Vector2d> iedges(4);
-    std::vector<Eigen::Vector2d> jedges(4);
-    for (int p = 0; p < 4; ++p)
-    {
-        iedges.push_back(icorners.col( (p+1)%4 ) - icorners.col(p)); 
-        jedges.push_back(jcorners.col( (p+1)%4 ) - jcorners.col(p));      
-    }    
-    double iarea = std::abs(eigen_vector2d_cross(iedges[0], iedges[1]));
-    double jarea = std::abs(eigen_vector2d_cross(jedges[0], jedges[1]));
-    double union = iarea + jarea;
+    const Rectangle2D irec(Box3dToCorners(ibox));
+    const Rectangle2D jrec(Box3dToCorners(jbox));
+    double union = irec.getArea() + jrec.getArea();
     double inter;
     std::vector<Eigen::Vector2d> vertexes;
     //find vertex of inter polygon.
     for (int i = 0; i < 4; ++i)
     {
         //is ith point inside jbox?
-        Eigen::Vector2d & ipoint = icorners.col(i);
-        if (ipoint(0) >= j_xmin && ipoint(0) <= j_xmax && ipoint(1) >= j_ymin && ipoint(1) <= j_ymax)
+        Eigen::Vector2d & ipoint = irec.corners.col(i);
+        if (jrec.isInsidePoint(ipoint))
         {
-            //maybe inside
-            //ABxAP
-            Eigen::Vector2d AP, BP, CP, DP;
-            AP = ipoint - jcorners.col(0);
-            BP = ipoint - jcorners.col(1);
-            CP = ipoint - jcorners.col(2);
-            DP = ipoint - jcorners.col(3);
-            if (eigen_vector2d_cross(jedges[0], AP) * eigen_vector2d_cross(jedges[2], CP) > 0) && (eigen_vector2d_cross(jedges[1], BP) * eigen_vector2d_cross(jedges[3], CP) > 0)
-            {
-                vertexes.push_back(ipoint);
-            }
+            vertexes.push_back(ipoint);
         }
         //is ith edge intersect with jbox?
         for (int j = 0; j < 4; ++j)
         {
             //is ith edge intersect with jth edge?
-
+            //are they intersect? 
+            //what is the intersect point?
+            //will there be repeat?
             //if yes, is (j+1) th point inside ibox?
-
+            Eigen::Vector2d & jpoint = jrec.corners.col( (j+1)%4 );
+            if (irec.isInsidePoint(jpoint))
+            {
+                vertexes.push_back(jpoint);
+            }
         }
     }
     
@@ -119,22 +127,20 @@ double BoxIoUBev(const Eigen::MatrixXd & icorners, const Eigen::MatrixXd & jcorn
     
 }
 
-bool IsInsideRectangle(const Eigen::Vector2d & p, const Eigen::Matrix2d & rec)
+std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxes, std::vector<DetectedBox> jBoxes)
 {
-    bool inside = false;
-    double xmax, xmin, ymax, ymin;
-    xmax = rec.row(0).maxCoeff();
-    xmin = rec.row(0).minCoeff();
-    ymax = rec.row(1).maxCoeff();
-    ymin = rec.row(1).minCoeff();
-    
-    if (p.x() >= xmin && p.x() <= xmax && p.y() >= ymin && p.y() <= ymax)
+    std::vector< std::vector<double> > dist;
+    for (size_t i = 0; i < iBoxes.size(); ++i)
     {
-
+        std::vector<double> dist_row;
+        for (size_t j = 0; j < jBoxes.size(); ++j)
+        {   
+            dist_row[j] = 1 - 0.02*i + 0.15*j;
+        }
+        dist.push_back(dist_row);
     }
-
-    return inside;
+    return dist;
 }
-//8corners to box3d
+
 
 #endif
