@@ -30,7 +30,7 @@ find_package(Boost REQUIRED COMPONENTS
 
 include_directories(
   include
-    ${PROJECT_SOURCE_DIR}/tracking
+    ${PROJECT_SOURCE_DIR}/tracking/include
 	${catkin_INCLUDE_DIRS} 
 	${PCL_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}
@@ -73,7 +73,6 @@ target_link_libraries(kittiHelperRaw ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${Open
 
 #add_executable(subTracklet src/subTracklet.cpp)
 #target_link_libraries(subTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-
 
 
 
