@@ -3,7 +3,7 @@
 #include "utils.h"
 #include <glog/logging.h>
 
-Tracklet::Tracklet(const DetectedBox & det, const int & start_frame, const uint32_t & id){
+Tracklet::Tracklet(const DetectedBox & det, const int & start_frame, const int & id){
     start_frame_ = start_frame;
     duration_ = 1;
     id_ = id;
@@ -85,7 +85,7 @@ void TrackletManager::AddTracklet(const DetectedBox & first_box, const int & sta
     tracklets_.push_back(track);
 }
 
-bool TrackletManager::DelTracklet(const uint32_t & target_id)
+bool TrackletManager::DelTracklet(const int & target_id)
 {
     bool found = false;
     for (size_t i = 0; i < tracklets_.size(); ++i)
@@ -189,7 +189,7 @@ void TrackletManager::Update(const std::vector<DetectedBox> & curr_boxes)
 
 
     //KalmanPredict: predict each valid tracklets from t-1 to t.
-    //construct std::map<uint32_t, DetectdBox> using the last box of each tracklet at tracklets
+    //construct std::map<int, DetectdBox> using the last box of each tracklet at tracklets
     //match by hugiran algorithm
     /*
     if matched:
@@ -283,13 +283,13 @@ void TrackletManager::CheckNewbornObjects(const std::vector<DetectedBox> & curr_
 }
 
 
-std::map<uint32_t, DetectedBox> TrackletManager::GetCurrentObjects()
+std::map<int, DetectedBox> TrackletManager::GetCurrentObjects()
 {
-    std::map<uint32_t, DetectedBox> boxes;
+    std::map<int, DetectedBox> boxes;
     for (size_t i = 0; i < tracklets_.size(); ++i)
     {
         DetectedBox curr_box = tracklets_[i].GetLatestBox();
-        uint32_t id = tracklets_[i].id_;
+        int id = tracklets_[i].id_;
         boxes[id] = curr_box;
     }
     return boxes;
