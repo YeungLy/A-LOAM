@@ -16,8 +16,8 @@
 class Rectangle2D {
 
     public:
-    Rectangle2D(const Eigen::MatrixXd & crns); 
-    bool isInsidePoint(const Eigen::Vector2d  p);
+    Rectangle2D(Eigen::MatrixXd crns); 
+    bool isInsidePoint(const Eigen::Vector2d & p);
     bool isEndPoint(const Eigen::Vector2d & p);
     double getArea(); 
     double getIntersectArea(Rectangle2D & rec);
@@ -28,8 +28,8 @@ class Rectangle2D {
 
 };
 //box3d to 8corners
-Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
-{
+Eigen::MatrixXd Box3dToCorners(const DetectedBox & box);
+/*{
     //8corners: (x,y,z), 3*8
     Eigen::MatrixXd corners(3, 8);
     corners << box.l / 2., -box.l / 2., -box.l / 2., box.l / 2., box.l / 2., -box.l / 2., -box.l / 2., box.l / 2.,
@@ -44,9 +44,9 @@ Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
     std::cout << "8 3D corners of box:  \n" << corners << std::endl;
 
     return corners;
-}
-double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox)
-{
+}*/
+double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox);
+/*{
     
     //icorners: 2*4, jcorners: 2*4, four 2D box corner points in clockwise.
     double iou;
@@ -64,6 +64,8 @@ double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox)
     std::cout << "[BoxIoUBev]iou: " << iou << std::endl;
     
     return iou;
-}
+}*/
+
+std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxes, std::vector<DetectedBox> jBoxes);
 
 #endif

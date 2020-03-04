@@ -9,4 +9,4 @@ include_directories(
 )
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/../src tracking_srcs)
 add_executable(test_iou test_iou.cpp ${tracking_srcs})
-#target_link_libraries(test_iou ${tracking_srcs})
+target_link_libraries(test_iou glog)

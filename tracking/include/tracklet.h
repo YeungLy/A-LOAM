@@ -13,7 +13,7 @@ struct DetectedBox{
     double x, y, z;
     double l, w, h;
     double yaw;
-    DetectedBox();
+    DetectedBox(): x(), y(), z(), l(), w(), h(), yaw() {}
     DetectedBox(double x, double y, double z, double l, double w, double h, double yaw):x(x),y(y),z(z),l(l),w(w),h(h),yaw(yaw) {}
 };
         
