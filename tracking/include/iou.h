@@ -18,10 +18,9 @@ class Rectangle2D {
     public:
     Rectangle2D(const Eigen::MatrixXd & crns); 
     bool isInsidePoint(const Eigen::Vector2d  p);
-    
-    double isEndPoint(const Eigen::Vector2d & p);
+    bool isEndPoint(const Eigen::Vector2d & p);
     double getArea(); 
-    double getIntersectArea(const Rectangle2D & rec);
+    double getIntersectArea(Rectangle2D & rec);
     
     Eigen::MatrixXd corners;
     Eigen::MatrixXd edges;

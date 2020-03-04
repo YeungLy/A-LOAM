@@ -43,7 +43,7 @@ bool Rectangle2D::isInsidePoint(const Eigen::Vector2d & p)
     return (eigen_vector2d_cross(edges.col(0), AP) * eigen_vector2d_cross(edges.col(2), CP) > 0) 
             && (eigen_vector2d_cross(edges.col(1), BP) * eigen_vector2d_cross(edges.col(3), DP) > 0);
 }
-double Rectangle2D::isEndPoint(const Eigen::Vector2d & p)
+bool Rectangle2D::isEndPoint(const Eigen::Vector2d & p)
 {
     return corners.col(0) == p || corners.col(1) == p || corners.col(2) == p || corners.col(3) == p;
 }
