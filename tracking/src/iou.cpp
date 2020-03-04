@@ -101,7 +101,7 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
             getMinMaxofTwoCorners(rec.corners.col(jedge_a), rec.corners.col(jedge_b), j_xmax, j_xmin, j_ymax, j_ymin);
             if (j_xmin > i_xmax || j_xmax < i_xmin || j_ymin > i_ymax || j_ymax < i_ymin )
             {//jth edge is outside of ith edge.
-                std::cout << "[getIntersectArea] jedge " << j << " is outside of iedge " << i << std::endl;
+                //std::cout << "[getIntersectArea] jedge " << j << " is outside of iedge " << i << std::endl;
                 continue;
             }     
             Eigen::Vector2d ja_ia = corners.col(iedge_a) - rec.corners.col(jedge_a);

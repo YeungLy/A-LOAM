@@ -52,6 +52,8 @@ target_link_libraries(aSegment ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_executable(aTracklet src/object.cpp)
 target_link_libraries(aTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES} tracking glog)
 
+add_executable(aTestTracklet src/test_tracking.cpp)
+target_link_libraries(aTestTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} tracking glog)
 
 add_executable(ascanRegistration src/scanRegistration.cpp)
 target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})
