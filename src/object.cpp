@@ -72,7 +72,6 @@
 #include "ros/node_handle.h"
 #include "ros/rate.h"
 #include "tracklet.h"
-#include "utils.h"
 using std::atan2;
 using std::cos;
 using std::sin;

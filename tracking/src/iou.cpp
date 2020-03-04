@@ -247,13 +247,13 @@ std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxe
     std::vector< std::vector<double> > dist;
     for (size_t i = 0; i < iBoxes.size(); ++i)
     {
-        Eigen::MatrixXd ibox_corners3d = Box3dToCorners(ibox);
+        Eigen::MatrixXd ibox_corners3d = Box3dToCorners(iBoxes[i]);
         Rectangle2D irec(ibox_corners3d.topLeftCorner(2, 4));
         double ivol = irec.getArea() * iBoxes[i].h;
         std::vector<double> dist_row;
         for (size_t j = 0; j < jBoxes.size(); ++j)
         {   
-            Eigen::MatrixXd jbox_corners3d = Box3dToCorners(jbox);
+            Eigen::MatrixXd jbox_corners3d = Box3dToCorners(jBoxes[j]);
             Rectangle2D jrec(jbox_corners3d.topLeftCorner(2, 4));
             double jvol = jrec.getArea() * jBoxes[j].h;
             double inter_area = irec.getIntersectArea(jrec);

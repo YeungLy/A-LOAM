@@ -1,6 +1,6 @@
 //trajectory and track manager
 #include "tracklet.h"
-#include "utils.h"
+#include "iou.h"
 #include <glog/logging.h>
 
 Tracklet::Tracklet(const DetectedBox & det, const int & start_frame, const int & id){
@@ -69,6 +69,7 @@ TrackletManager::TrackletManager()
 
     google::InitGoogleLogging("TrackletManager");
     google::SetStderrLogging(google::GLOG_INFO);
+    FLAGS_log_dir = "/home/ncslab/Project/SLAM/LidarObjectSLAM/catkin_ws/src/LidarObjectSLAM/log";
     LOG(INFO) << "Start logging..";
     
 }
@@ -294,3 +295,5 @@ std::map<int, DetectedBox> TrackletManager::GetCurrentObjects()
     }
     return boxes;
 }
+
+

@@ -6,6 +6,8 @@
 #include "KalmanFilter.h"
 #include "Hungarian.h"
 
+//#include <jsk_recognition_msgs/BoundingBox.h>
+//#include <jsk_recognition_msgs/BoundingBoxArray.h>
 #include <vector>
 #include <map>
 
@@ -90,5 +92,7 @@ class TrackletManager
     HungarianAlgorithm matcher_;
 };
 
+
+//std::vector<DetectedBox> RosMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayConstPtr boxes_msg);
 
 #endif

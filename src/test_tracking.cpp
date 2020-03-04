@@ -18,8 +18,8 @@
 #include "ros/init.h"
 #include "ros/node_handle.h"
 #include "ros/rate.h"
-#include "tracking/tracklet.h"
-#include "tracking/utils.h"
+
+#include "tracklet.h"
 using std::atan2;
 using std::cos;
 using std::sin;
@@ -52,6 +52,32 @@ bool has_gt_objects;
 
 
 
+std::vector<DetectedBox> RosMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayConstPtr boxes_msg)
+{
+
+    std::vector<DetectedBox> boxes;
+    for (size_t i = 0; i < boxes_msg->boxes.size(); ++i)
+    {
+        DetectedBox box;
+        box.x = boxes_msg->boxes[i].pose.position.x;
+        box.y = boxes_msg->boxes[i].pose.position.y;
+        box.z = boxes_msg->boxes[i].pose.position.z;
+        double qx = boxes_msg->boxes[i].pose.orientation.x;
+        double qy = boxes_msg->boxes[i].pose.orientation.y;
+        double qz = boxes_msg->boxes[i].pose.orientation.z;
+        double qw = boxes_msg->boxes[i].pose.orientation.w;
+        Eigen::Quaterniond q(qw, qx, qy, qz);
+        //Z-Y-X 
+        box.yaw = q.matrix().eulerAngles(2, 1, 0)(0);
+        //ROS_INFO_STREAM("box msg pose orientation(x,y,z,w) : " << q.coeffs() << "\n yaw: " << box.yaw);
+        box.l = boxes_msg->boxes[i].dimensions.x;
+        box.w = boxes_msg->boxes[i].dimensions.y;
+        box.h = boxes_msg->boxes[i].dimensions.z;
+
+    }
+    return boxes;
+}
+
 
 void objectArrayHandler(const jsk_recognition_msgs::BoundingBoxArrayConstPtr &objectArrayMsg)
 {
@@ -76,13 +102,6 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "tracklets");
     ros::NodeHandle nh;
-    int N_SCANS;
-    nh.param<int>("scan_line", N_SCANS, 16);
-
-    double MINIMUM_RANGE;
-    nh.param<double>("minimum_range", MINIMUM_RANGE, 0.1);
-
-    printf("scan line number %d \n", N_SCANS);
 
     nh.param<bool>("has_gt_objects", has_gt_objects);
     //string boxes_topic = "object_boxes";
@@ -114,7 +133,7 @@ int main(int argc, char **argv)
             timeLaserOdometry = laserOdometryBuf.front()->header.stamp.toSec();
             if (timeObjectArray != timeLaserOdometry ) 
             {
-                ROS_INFO("unsync message! time laserCloud: %f, laserOdometry: %f, objectArray: %f", timeLaserCloud, timeLaserOdometry, timeObjectArray);
+                ROS_INFO("unsync message! time laserOdometry: %f, objectArray: %f", timeLaserOdometry, timeObjectArray);
                 mBuf.unlock();
                 break;
             }
@@ -142,11 +161,11 @@ int main(int argc, char **argv)
 
             
             //publish
-            std::map<uint32_t, DetectedBox> objects = tracker.GetCurrentObjects();
+            std::map<int, DetectedBox> objects = tracker.GetCurrentObjects();
             for (auto it = objects.begin(); it != objects.end(); ++it)
             {
-                uint32_t id = it->first();
-                DetectedBox box = it->second();
+                int id = it->first;
+                DetectedBox box = it->second;
                 Eigen::Vector3d t_lidar_obj(box.x, box.y, box.z);
                 //w,x,y,z
                 Eigen::AngleAxisd rz(box.yaw, Eigen::Vector3d::UnitZ());
@@ -158,7 +177,7 @@ int main(int argc, char **argv)
                 nav_msgs::Odometry objOdom;
                 objOdom.header.frame_id = "/camera_init";
                 objOdom.child_frame_id = "/object_odom";
-                objOdom.header.stamp = ros::Time().fromeSec(timeObjectArray);
+                objOdom.header.stamp = ros::Time().fromSec(timeObjectArray);
                 objOdom.pose.pose.orientation.x = q_w_obj.x();
                 objOdom.pose.pose.orientation.y = q_w_obj.y();
                 objOdom.pose.pose.orientation.z = q_w_obj.z();
@@ -169,7 +188,7 @@ int main(int argc, char **argv)
                 
                 if (pubObjectsOdomDict.find(id) == pubObjectsOdomDict.end())
                 {
-                    ros::Publisher pubObjOdom = nh.advertise<nav_msgs::Odometry>("/obj_"+id+"_odom", 3);
+                    ros::Publisher pubObjOdom = nh.advertise<nav_msgs::Odometry>("/obj_"+std::to_string(id)+"_odom", 3);
                     pubObjectsOdomDict[id] = pubObjOdom;
                 }
                 pubObjectsOdomDict[id].publish(objOdom);        
