@@ -73,6 +73,7 @@ std::vector<DetectedBox> RosMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayCon
         box.l = boxes_msg->boxes[i].dimensions.x;
         box.w = boxes_msg->boxes[i].dimensions.y;
         box.h = boxes_msg->boxes[i].dimensions.z;
+        boxes.push_back(box);
 
     }
     return boxes;

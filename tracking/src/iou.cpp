@@ -71,8 +71,8 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
 {
     std::vector<Eigen::Vector2d> vertexes;
     std::map<Eigen::Vector2d, char, MyCompareEigenVector2d> vertexes_exist;
-    std::cout << "[getIntersectArea] irec.corners: " << this->corners << std::endl;
-    std::cout << "[getIntersectArea] jrec.corners: " << rec.corners << std::endl;
+    //std::cout << "[getIntersectArea] irec.corners: " << this->corners << std::endl;
+    //std::cout << "[getIntersectArea] jrec.corners: " << rec.corners << std::endl;
     
     for (int i = 0; i < 4; ++i)
     {
@@ -80,8 +80,8 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
         Eigen::Vector2d ipoint = corners.col(i);
         if (rec.isInsidePoint(ipoint))
         {
-            std::cout << "[getIntersectArea] found a vertex of intersect area, "
-                      <<"because ipoint " << i << " is inside of jrec! " << std::endl; 
+            //std::cout << "[getIntersectArea] found a vertex of intersect area, "
+            //          <<"because ipoint " << i << " is inside of jrec! " << std::endl; 
             vertexes.push_back(ipoint);
             vertexes_exist[ipoint] = 'y';
         }
@@ -122,8 +122,8 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
                 Eigen::Vector2d intersect_point = ipoint + t * iedge;
                 if (vertexes_exist.find(intersect_point) != vertexes_exist.end())
                     continue;
-                std::cout << "[getIntersectArea] found a vertex of intersect area, " 
-                  << "because iedge " << i <<" is intersect with jedge " << j << " by point " << intersect_point << std::endl;
+                //std::cout << "[getIntersectArea] found a vertex of intersect area, " 
+                //  << "because iedge " << i <<" is intersect with jedge " << j << " by point " << intersect_point << std::endl;
                 vertexes.push_back(intersect_point); //? how to deal with repeat ones?                                  
                 vertexes_exist[intersect_point] = 'y';
                 //next point might be on iedge_b inside point
@@ -148,16 +148,18 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
             if (this->isInsidePoint(rec.corners.col(j)))
             {
                 vertexes.push_back(rec.corners.col(j));
-                std::cout << "[getIntersectArea] found intersect vertexes because jpoint " << j <<  " is inside of irec!" << std::endl;
+                //std::cout << "[getIntersectArea] found intersect vertexes because jpoint " << j <<  " is inside of irec!" << std::endl;
             }
         }
     }
+    /*
     std::cout << "[getIntersectArea] output of all vertexes: " << std::endl;
     for (auto i = 0; i < vertexes.size(); ++i)
     {
         //output vertexes
         std::cout << i << ": \n" << vertexes[i] << std::endl;
     }
+    */
     if (vertexes.size() < 3)
     {//no intersection
         return 0.0;
@@ -171,7 +173,7 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
         pb = vertexes[i];
         pc = vertexes[i + 1];
         double triangle_area = std::abs(eigen_vector2d_cross(pb-pa, pc-pa) ) / 2;
-        std::cout << "[getIntersectArea]triangle area: " << triangle_area << " for (0, " << i << ", " << i+1 << " )" << std::endl;
+        //std::cout << "[getIntersectArea]triangle area: " << triangle_area << " for (0, " << i << ", " << i+1 << " )" << std::endl;
         area += triangle_area;
     }
     return area;
@@ -216,7 +218,7 @@ Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
     Eigen::MatrixXd t_mat(3, 8);
     t_mat << t, t, t, t, t, t, t, t;
     corners = r_mat * corners + t_mat;
-    std::cout << "8 3D corners of box:  \n" << corners << std::endl;
+    //std::cout << "8 3D corners of box:  \n" << corners << std::endl;
 
     return corners;
 }
@@ -260,6 +262,10 @@ std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxe
             double inter_h = iBoxes[i].h < jBoxes[j].h ? iBoxes[i].h : jBoxes[j].h;
             double inter_vol = inter_area * inter_h;
             double iou = inter_vol / (ivol + jvol - inter_vol);
+            std::cout << "[CalculateIoU3d] i: " << i << ", boxes:" << iBoxes[i].getPrintString() 
+                      << "\nj: " << j << ", boxes: " << jBoxes[j].getPrintString() 
+                      << "\niou: " << iou << ", dist: " << 1 - iou << std::endl; 
+
             dist_row.push_back(1 - iou);
             //dist_row[j] = 1 - 0.02*i + 0.15*j;
         }

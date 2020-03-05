@@ -9,6 +9,7 @@
 //#include <jsk_recognition_msgs/BoundingBox.h>
 //#include <jsk_recognition_msgs/BoundingBoxArray.h>
 #include <vector>
+#include <string>
 #include <map>
 
 struct DetectedBox{
@@ -17,6 +18,12 @@ struct DetectedBox{
     double yaw;
     DetectedBox(): x(), y(), z(), l(), w(), h(), yaw() {}
     DetectedBox(double x, double y, double z, double l, double w, double h, double yaw):x(x),y(y),z(z),l(l),w(w),h(h),yaw(yaw) {}
+    std::string getPrintString() const 
+    { 
+        return "x: " + std::to_string(x) + ", y: " + std::to_string(y) + ", z: " + std::to_string(z) 
+               + ", l: " + std::to_string(l) + ", w: " + std::to_string(w) + ", h: " + std::to_string(h)
+               + ", yaw: " + std::to_string(yaw); 
+    }
 };
         
 
@@ -82,11 +89,11 @@ class TrackletManager
     std::vector<int> newborn_objects_age_;
 
     int tracklets_count_ = 0;
-    int frame_idx = 0;
+    int frame_idx_ = 0;
     
     double MAX_DIST = 0.5; //?
-    double MAX_DIST_NEWBORN = 0.3;
-    int MAX_MISS_COUNT = 2;
+    double MAX_DIST_NEWBORN = 0.7;
+    int MAX_MISS_COUNT = 4;
     int MIN_HIT_COUNT = 3;
 
     HungarianAlgorithm matcher_;
