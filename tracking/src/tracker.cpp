@@ -1,5 +1,5 @@
 //trajectory and track manager
-#include "tracklet.h"
+#include "tracker.h"
 #include "iou.h"
 #include <glog/logging.h>
 
@@ -11,48 +11,64 @@ Tracklet::Tracklet(const DetectedBox & det, const int & start_frame, const int &
     history_.push_back(det);
 
     //Setting KalmanFilter parameters
-    //kf_.nx = 10;  //state dimensions
-    kf_.nx = 7;  //state dimensions
-    //kf_.nz = 7;   //measurement dimensions
-    kf_.nz = 4;   //measurement dimensions
-    kf_.F = Eigen::MatrixXd::Identity(kf_.nx, kf_.nx);
-    kf_.H = Eigen::MatrixXd::Zero(kf_.nz, kf_.nx);
-    kf_.H.topLeftCorner(kf_.nz, kf_.nz) = Eigen::MatrixXd::Identity(kf_.nz, kf_.nz);
-    kf_.P0 = Eigen::MatrixXd::Identity(kf_.nx, kf_.nx);
-    kf_.R = Eigen::MatrixXd::Identity(kf_.nz, kf_.nz);
-    kf_.Q = Eigen::MatrixXd::Identity(kf_.nx, kf_.nx);
+    int nx = 10;  //state dimensions
+    //nx = 7;  //state dimensions
+    int nz = 7;   //measurement dimensions
+    //nz = 4;   //measurement dimensions
+    Eigen::MatrixXd F = Eigen::MatrixXd::Identity(nx, nx);
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(nz, nx);
+    H.topLeftCorner(nz, nz) = Eigen::MatrixXd::Identity(nz, nz);
+    Eigen::MatrixXd P0 = Eigen::MatrixXd::Identity(nx, nx);
+    P0.bottomRightCorner(3, 3) *= 1000.;
+    P0 *= 10.;
+    Eigen::MatrixXd R = Eigen::MatrixXd::Identity(nz, nz);
+    Eigen::MatrixXd Q = Eigen::MatrixXd::Identity(nx, nx);
+    Q.topLeftCorner(7, 7) *= 0.01;
 
-    Eigen::VectorXd init_state(kf_.nx);
-    /*
+    Eigen::VectorXd init_state(nx);
     init_state << history_[0].x, history_[0].y, history_[0].z, 
                   history_[0].l, history_[0].w, history_[0].h, history_[0].yaw,
                   0.0, 0.0, 0.0;
-                   */
+    //
+    /*
     init_state << history_[0].x, history_[0].y, history_[0].z, 
                   history_[0].yaw, 
                   0.0, 0.0, 0.0;
+    //               */
 
+    //kf_ = new KalmanFilter(0.0, F, H, Q, R, P0);
+    kf_.setParameters(0.0, F, H, Q, R, P0);
+   
     kf_.init(start_frame, init_state);
     
 }
+///*
+Tracklet::~Tracklet()
+{
+    LOG(INFO) << "[~Tracklet] entering destroy function ";
+    //delete kf_;
+}
+//*/
 
 void Tracklet::predict()
 {
     kf_.predcit();
     DetectedBox pred_box;
+    //Eigen::VectorXd state = kf_.state();
     pred_box.x = kf_.x_hat_new(0);
     pred_box.y = kf_.x_hat_new(1);
     pred_box.z = kf_.x_hat_new(2);
-    /*
     pred_box.l = kf_.x_hat_new(3);
     pred_box.w = kf_.x_hat_new(4);
     pred_box.h = kf_.x_hat_new(5);
     pred_box.yaw = kf_.x_hat_new(6);
-    */
+    /*
     pred_box.yaw = kf_.x_hat_new(3);
     pred_box.l = history_[0].l;
     pred_box.w = history_[0].w;
     pred_box.h = history_[0].h;
+    */
+
     history_.push_back(pred_box);
     matched_ = false;   //reset to false for next new frame
     LOG(INFO) << "[Tracklet::predict] predict next frame box by KF: " << pred_box.getPrintString(); 
@@ -61,20 +77,20 @@ void Tracklet::predict()
 void Tracklet::update(const DetectedBox & det)
 {
     Eigen::VectorXd measurement(kf_.nz);
-    //measurement << det.x, det.y, det.z, det.l, det.w, det.h, det.yaw;
-    measurement << det.x, det.y, det.z, det.yaw;
+    measurement << det.x, det.y, det.z, det.l, det.w, det.h, det.yaw;
+    //measurement << det.x, det.y, det.z, det.yaw;
     kf_.update(measurement);
     size_t now = history_.size() - 1;
     history_[now].x = kf_.x_hat(0);
     history_[now].y = kf_.x_hat(1);
     history_[now].z = kf_.x_hat(2);
-    /*
     history_[now].l = kf_.x_hat(3);
     history_[now].w = kf_.x_hat(4);
     history_[now].h = kf_.x_hat(5);
     history_[now].yaw = kf_.x_hat(6);
-    */
+    /*
     history_[now].yaw = kf_.x_hat(3);
+    */
     LOG(INFO) << "[Tracklet::update] update predicted box using KF by measurment: " << history_[now].getPrintString(); 
 
 }
@@ -84,30 +100,31 @@ const DetectedBox & Tracklet::GetLatestBox()
     return history_[history_.size() - 1];
 }
 
-TrackletManager::TrackletManager()
+Tracker::Tracker()
 {
 
-    google::InitGoogleLogging("TrackletManager");
+    google::InitGoogleLogging("Tracker");
     google::SetStderrLogging(google::GLOG_INFO);
     FLAGS_log_dir = "/home/ncslab/Project/SLAM/LidarObjectSLAM/catkin_ws/src/LidarObjectSLAM/log";
     LOG(INFO) << "Start logging..";
     
 }
-TrackletManager::~TrackletManager()
+Tracker::~Tracker()
 {
     LOG(INFO) << "Shutdown logging..";
     google::ShutdownGoogleLogging();
 
 }
-void TrackletManager::AddTracklet(const DetectedBox & first_box, const int & start_frame)
+void Tracker::AddTracklet(const DetectedBox & first_box, const int & start_frame)
 {
     LOG(INFO) << "[AddTracklet] create new tracklet at frame: " <<start_frame;
     Tracklet track(first_box, start_frame, tracklets_count_);
     tracklets_count_ += 1;
     tracklets_.push_back(track);
+    LOG(INFO) << "[AddTracklet] finish push to tracklets_, new track pointer: " << &track;
 }
 
-bool TrackletManager::DelTracklet(const int & target_id)
+bool Tracker::DelTracklet(const int & target_id)
 {
     bool found = false;
     for (size_t i = 0; i < tracklets_.size(); ++i)
@@ -126,15 +143,21 @@ bool TrackletManager::DelTracklet(const int & target_id)
 }
 
 
-std::vector< std::vector<double> > TrackletManager::CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes)
+std::vector< std::vector<double> > Tracker::CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes)
 {
     return CalculateIoU3d(iBoxes, jBoxes);
 }
    
 
-void TrackletManager::Update(const std::vector<DetectedBox> & curr_boxes)
+void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
 {
-    LOG(INFO) << "[Update] Updating TrackletManager by curr_boxes at frame " << frame_idx_ << std::endl;
+    LOG(INFO) << "[Update] Updating Tracker by curr_boxes at frame " << frame_idx_;
+    if (curr_boxes.size() == 0)
+    {
+        LOG(INFO) << "[Update] No boxes detected at current frame ";
+        frame_idx_++;
+        return;
+    }
     if (tracklets_.size() == 0)
     {
         LOG(INFO) << "[Update] Still initializing tracklets";
@@ -236,7 +259,7 @@ void TrackletManager::Update(const std::vector<DetectedBox> & curr_boxes)
     */
 }
 
-void TrackletManager::CheckNewbornObjects(const std::vector<DetectedBox> & curr_boxes)
+void Tracker::CheckNewbornObjects(const std::vector<DetectedBox> & curr_boxes)
 {
     LOG(INFO) << "[CheckNewbornObjects] Checking newborn objects";
     if (newborn_objects_.size() == 0)
@@ -251,10 +274,11 @@ void TrackletManager::CheckNewbornObjects(const std::vector<DetectedBox> & curr_
         return;
     }
 
+    LOG(INFO) << "past newborn objects: " << newborn_objects_.size() << ", curr unmatched boxes: " << curr_boxes.size();
     
     std::vector< std::vector<double> > dist = CreateDistanceMatrix(curr_boxes, newborn_objects_);
     std::vector<int> assignment;
-    std::vector<int> updated(newborn_objects_.size());
+    std::vector<int> updated(newborn_objects_.size(), 0);
     matcher_.Solve(dist, assignment);
     for (size_t i_curr = 0; i_curr < assignment.size(); ++i_curr)
     {
@@ -323,7 +347,7 @@ void TrackletManager::CheckNewbornObjects(const std::vector<DetectedBox> & curr_
 }
 
 
-std::map<int, DetectedBox> TrackletManager::GetCurrentObjects()
+std::map<int, DetectedBox> Tracker::GetCurrentObjects()
 {
     std::map<int, DetectedBox> boxes;
     for (size_t i = 0; i < tracklets_.size(); ++i)

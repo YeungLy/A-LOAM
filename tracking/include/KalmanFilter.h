@@ -26,7 +26,14 @@ public:
   *   R - Measurement noise covariance,  nz*nz  
   *   P - Estimate error covariance,  nx*nx
   */
-  KalmanFilter(
+
+  /**
+  * Create a blank estimator.
+  */
+  KalmanFilter();
+
+
+  void setParameters(
       double dt,
       const Eigen::MatrixXd& F,
       const Eigen::MatrixXd& H,
@@ -34,12 +41,6 @@ public:
       const Eigen::MatrixXd& R,
       const Eigen::MatrixXd& P
   );
-
-  /**
-  * Create a blank estimator.
-  */
-  KalmanFilter();
-
   /**
   * Initialize the filter with initial states as zero.
   */

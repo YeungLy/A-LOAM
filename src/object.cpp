@@ -71,7 +71,7 @@
 #include "ros/init.h"
 #include "ros/node_handle.h"
 #include "ros/rate.h"
-#include "tracklet.h"
+
 using std::atan2;
 using std::cos;
 using std::sin;
@@ -88,11 +88,9 @@ std::queue<nav_msgs::OdometryConstPtr> laserOdometryBuf;
 std::queue<jsk_recognition_msgs::BoundingBoxArrayConstPtr> objectArrayBuf;
 
 std::mutex mBuf;
+jsk_recognition_msgs::BoundingBoxArrayPtr boxesLast(new jsk_recognition_msgs::BoundingBoxArray());
 jsk_recognition_msgs::BoundingBoxArrayPtr boxesCurr(new jsk_recognition_msgs::BoundingBoxArray());
 pcl::PointCloud<PointType>::Ptr laserCloudIn(new pcl::PointCloud<PointType>());
-
-TrackletManager tracker;
-
 
 //lidar pose
 Eigen::Quaterniond q_w_lidar(1, 0, 0, 0);
@@ -106,6 +104,194 @@ std::map<uint32_t, nav_msgs::Path > objects_path_gt;
 bool has_gt_objects;
 //std::map<int, nav_msgs::Odometry > objects_odom;
 
+void matchBoxes()
+{
+    //box to trajectories
+    //match last and curr by center points.
+    
+    //using motion model to estimate curr timestamp from last timestamp
+    
+    //N*M, or use Eigen::Matrix?
+    bool * matched_last = new bool[boxesLast->boxes.size()];
+    memset(matched_last, 0, sizeof(matched_last));
+    int max_label = -1;
+    ROS_INFO_STREAM("matching boxesCurr(size: " << boxesCurr->boxes.size() << " ) to boxesLast (size: " << boxesLast->boxes.size() << ")");
+    for (size_t i_curr = 0; i_curr < boxesCurr->boxes.size(); ++i_curr)
+    {
+        //[TODO] maybe should use IoU !!
+        double center_curr_x  = boxesCurr->boxes[i_curr].pose.position.x;
+        double center_curr_y  = boxesCurr->boxes[i_curr].pose.position.y;
+        double center_curr_z  = boxesCurr->boxes[i_curr].pose.position.z;
+        double min_dist = 5;
+        int matched_idx = -1;
+        for (size_t i_last = 0; i_last < boxesLast->boxes.size(); ++i_last)
+        {
+            //should check whether this last box matched or not.
+            if (matched_last[i_last])
+                continue;
+
+            double center_last_x  = boxesLast->boxes[i_last].pose.position.x;
+            double center_last_y  = boxesLast->boxes[i_last].pose.position.y;
+            double center_last_z  = boxesLast->boxes[i_last].pose.position.z;
+            double dist = sqrt((center_curr_x - center_last_x) * (center_curr_x - center_last_x) +
+                               (center_curr_y - center_last_y) * (center_curr_y - center_last_y) +
+                               (center_curr_z - center_last_z) * (center_curr_z - center_last_z));
+
+            //ROS_INFO_STREAM("i_curr: " << i_curr << ", position: (" << center_curr_x << ", " << center_curr_y << ", " << center_curr_z << ")");
+            //ROS_INFO_STREAM("i_last: " << i_last << ", position: (" << center_last_x << ", " << center_last_y << ", " << center_last_z << ")");
+            //ROS_INFO_STREAM("i_curr: " << i_curr << " , i_last: " << i_last << " , dist: " << dist);
+
+
+            if (dist < min_dist)
+            {
+                min_dist = dist;
+                matched_idx = i_last;
+            }
+
+        }
+
+        if (matched_idx < 0)
+        {//newcoming object. 
+            boxesCurr->boxes[i_curr].label = objNum;
+            ++objNum;
+            //ROS_INFO_STREAM("new object!");
+        }
+        else
+        {
+
+            //ROS_INFO_STREAM("i_curr: " << i_curr << " , matched_idx: " << matched_idx << " , dist: " << min_dist);
+            matched_last[matched_idx] = true;
+            boxesCurr->boxes[i_curr].label = boxesLast->boxes[matched_idx].label;
+        }
+
+        //ROS_INFO_STREAM("i_curr: " << i_curr << " , label: " << boxesCurr->boxes[i_curr].label);
+        //ROS_INFO_STREAM("i_curr: " << i_curr << " , gt-label: " << boxesCurr->boxes[i_curr].value);
+    }
+    
+}
+void trackObjects()
+{
+
+    //extract point cloud
+    //for loop process each box.
+    for (size_t i = 0; i < boxesCurr->boxes.size(); ++i)
+    {
+        jsk_recognition_msgs::BoundingBox box = boxesCurr->boxes[i];
+        pcl::CropBox<PointType> boxFilter(true);
+        boxFilter.setInputCloud(laserCloudIn);
+        Eigen::Vector4f max_pt, min_pt;
+        Eigen::Vector3f range{3.0, 3.0, 1.0};
+        Eigen::Vector3f dimensions{box.dimensions.x, box.dimensions.y, box.dimensions.z};
+        Eigen::Vector3f center{box.pose.position.x, box.pose.position.y, box.pose.position.z};
+        max_pt << (dimensions+range)/2.0, 1.0;
+        min_pt << -1*(dimensions+range)/2.0, 1.0;
+        boxFilter.setMax(max_pt);
+        boxFilter.setMin(min_pt);
+        Eigen::Vector3d translation{box.pose.position.x, box.pose.position.y, box.pose.position.z};
+        boxFilter.setTranslation(translation.cast<float>());
+        Eigen::Quaterniond quaternion(box.pose.orientation.x, box.pose.orientation.y, box.pose.orientation.z, box.pose.orientation.w);
+        Eigen::Vector3d euler_angles = quaternion.toRotationMatrix().eulerAngles(0, 1, 2);
+        Eigen::Vector3d rotation{euler_angles(0), euler_angles(1), euler_angles(2)};
+        boxFilter.setRotation(rotation.cast<float>());
+        pcl::PointCloud<PointType>::Ptr objCloud(new pcl::PointCloud<PointType>());
+        boxFilter.filter(*objCloud);
+        ROS_INFO_STREAM("[trackObjects]i_curr: " << i 
+                << ", box.label: " << box.label 
+                <<",  segmented cloud points size: " << objCloud->points.size());
+
+        double para_q[4] = {1, 0, 0, 0};
+        double para_t[3] = {0, 0, 0};
+        Eigen::Map<Eigen::Quaterniond> q_w_obj(para_q);
+        Eigen::Map<Eigen::Vector3d> t_w_obj(para_t);
+        ceres::LossFunction * loss_function = new ceres::HuberLoss(0.1);
+        ceres::LocalParameterization * q_parameterization = new ceres::EigenQuaternionParameterization();
+        ceres::Problem::Options problem_options;
+        ceres::Problem problem(problem_options);
+        problem.AddParameterBlock(para_q, 4, q_parameterization);
+        problem.AddParameterBlock(para_t, 3);
+
+
+        for (size_t p = 0; p < objCloud->points.size(); ++p)
+        {
+            Eigen::Vector3d p_lidar(objCloud->points[p].x, objCloud->points[p].y, objCloud->points[p].z);
+            Eigen::Vector3d p_world, p_object;
+            p_world = q_w_lidar * p_lidar + t_w_lidar;
+            p_object = quaternion.inverse() * p_lidar - quaternion.inverse() * translation;
+            ceres::CostFunction * cost_function = LidarDistanceFactor::Create(p_object, p_world);
+            problem.AddResidualBlock(cost_function, loss_function, para_q, para_t);
+        }
+        ceres::Solver::Options options;
+        options.linear_solver_type = ceres::DENSE_QR;
+        //options.max_num_iterations = 4;
+        options.minimizer_progress_to_stdout = false;
+        ceres::Solver::Summary summary;
+        ceres::Solve(options, &problem, &summary);
+        ROS_INFO_STREAM("[trackObjects]" << summary.BriefReport());
+             //save msg
+
+        nav_msgs::Odometry odom_msg;
+        odom_msg.header.frame_id = "/camera_init";
+        odom_msg.child_frame_id = "/object_odom";
+        odom_msg.header.stamp = ros::Time().fromSec(timeLaserOdometry);
+        odom_msg.pose.pose.orientation.x = q_w_obj.x();
+        odom_msg.pose.pose.orientation.y = q_w_obj.y();
+        odom_msg.pose.pose.orientation.z = q_w_obj.z();
+        odom_msg.pose.pose.orientation.w = q_w_obj.w();
+        odom_msg.pose.pose.position.x = t_w_obj.x();
+        odom_msg.pose.pose.position.y = t_w_obj.y();
+        odom_msg.pose.pose.position.z = t_w_obj.z();
+        pubObjectsOdomDict[box.label].publish(odom_msg);
+
+        if (objects_path.find(box.label) == objects_path.end())
+        {
+            nav_msgs::Path path_msg;
+            path_msg.header.frame_id = "/camera_init";
+            path_msg.header.stamp = ros::Time().fromSec(timeLaserOdometry);
+            objects_path[box.label] = path_msg;
+        }
+        geometry_msgs::PoseStamped pose_msg;
+        pose_msg.header = odom_msg.header;
+        pose_msg.pose = odom_msg.pose.pose;
+        pose_msg.header.stamp = odom_msg.header.stamp;
+        objects_path[box.label].poses.push_back(pose_msg);
+        pubObjectsPathDict[box.label].publish(objects_path[box.label]);
+
+        if (has_gt_objects) 
+        {
+            uint32_t gt_label = box.value;
+            if (objects_path_gt.find(gt_label) == objects_path_gt.end())
+            {
+                nav_msgs::Path path_gt_msg;
+                path_gt_msg.header.frame_id = "/camera_init";
+                path_gt_msg.header.stamp = ros::Time().fromSec(timeLaserOdometry);
+                objects_path_gt[gt_label] = path_gt_msg;
+            }
+            Eigen::Quaterniond q_w_obj_gt = q_w_lidar * quaternion;
+            Eigen::Vector3d t_w_obj_gt = q_w_lidar * translation + t_w_lidar;
+            geometry_msgs::PoseStamped pose_gt_msg;
+            pose_gt_msg.header = odom_msg.header;
+            pose_gt_msg.pose.orientation.x = q_w_obj_gt.x();
+            pose_gt_msg.pose.orientation.y = q_w_obj_gt.y();
+            pose_gt_msg.pose.orientation.z = q_w_obj_gt.z();
+            pose_gt_msg.pose.orientation.w = q_w_obj_gt.w();
+            pose_gt_msg.pose.position.x = t_w_obj_gt.x();
+            pose_gt_msg.pose.position.y = t_w_obj_gt.y();
+            pose_gt_msg.pose.position.z = t_w_obj_gt.z();
+            pose_gt_msg.header.stamp = odom_msg.header.stamp;
+            objects_path_gt[gt_label].poses.push_back(pose_gt_msg);
+            pubObjectsPathGTDict[gt_label].publish(objects_path_gt[box.label]);
+
+            ROS_INFO_STREAM("[trackObjects]rotation angles: w_obj: " << q_w_obj.toRotationMatrix().eulerAngles(0, 1, 2) << ", rot angles: w_obj_gt: " << q_w_obj_gt.toRotationMatrix().eulerAngles(0, 1, 2) << ", at time: " << timeLaserOdometry);
+
+
+        }
+
+    }
+    
+    
+    
+
+}
 
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 {
@@ -193,6 +379,7 @@ int main(int argc, char **argv)
             pcl::fromROSMsg(*laserCloudBuf.front(), *laserCloudIn);
             laserCloudBuf.pop();
 
+            jsk_recognition_msgs::BoundingBoxArrayPtr objectArrayIn(new jsk_recognition_msgs::BoundingBoxArray());
             boxesCurr->header = objectArrayBuf.front()->header;
             boxesCurr->boxes = objectArrayBuf.front()->boxes;
             objectArrayBuf.pop();
@@ -211,39 +398,67 @@ int main(int argc, char **argv)
 
             TicToc t_whole;
             //Filter pointcloud using crop box. dimension limit by diagonal line of box.
+            if (!systemInited)
+            {
+                systemInited = true;
+                if (objNum == 0) 
+                {
+                        //add object label for first frame.
+                        
+                    for (size_t i = 0; i < boxesCurr->boxes.size(); ++i)
+                    {
+                        boxesCurr->boxes[i].label = i;
 
-            tracker.Update(RosMsgToBoxes(boxesCurr));
+                        ++objNum;
+                        ros::Publisher pubObjectOdometry = nh.advertise<nav_msgs::Odometry>("/obj_"+std::to_string(i)+"_odom", 100);
+                        pubObjectsOdomDict[i] = pubObjectOdometry;
+                        ros::Publisher pubObjectPath = nh.advertise<nav_msgs::Path>("/obj_"+std::to_string(i)+"_path", 100);
+                        pubObjectsPathDict[i] = pubObjectPath;
+                        if (has_gt_objects)
+                        {
+                            ros::Publisher pubObjectPathGT = nh.advertise<nav_msgs::Path>("/obj_"+std::to_string(i)+"_path_gt", 100);
+                            pubObjectsPathGTDict[i] = pubObjectPathGT;
+                        }
+                    }
+                    ROS_INFO_STREAM("Initialize tracklets number " << pubObjectsOdomDict.size());
+                } 
+            }
+            else 
+            {
+                matchBoxes();
+                for (size_t i = 0; i < boxesCurr->boxes.size(); ++i)
+                {
+                    uint32_t label = boxesCurr->boxes[i].label;
+                    //if (label == pubObjectsOdomDict.size())
+                    if (pubObjectsOdomDict.find(label) == pubObjectsOdomDict.end())
+                    {
+                        ros::Publisher pubObjectOdometry = nh.advertise<nav_msgs::Odometry>("/obj_"+std::to_string(label)+"_odom", 100);
+                        pubObjectsOdomDict[label] = pubObjectOdometry;
+                        ros::Publisher pubObjectPath = nh.advertise<nav_msgs::Path>("/obj_"+std::to_string(label)+"_path", 100);
+                        pubObjectsPathDict[label] = pubObjectPath;
+                    }               
+
+                    if (has_gt_objects)
+                    {
+                        uint32_t gt_label = boxesCurr->boxes[i].value;
+                        if (pubObjectsPathGTDict.find(gt_label) == pubObjectsPathGTDict.end())
+                        {
+                            ros::Publisher pubObjectPathGT = nh.advertise<nav_msgs::Path>("/obj_"+std::to_string(i)+"_path_gt", 100);
+                            pubObjectsPathGTDict[gt_label] = pubObjectPathGT;
+                        }
+                                       
+                    }
+
+                }
+                trackObjects();
 
             
-            //publish
-            std::map<uint32_t, DetectedBox> objects = tracker.GetCurrentObjects();
-            for (auto it = objects.begin(); it != objects.end(); ++it)
-            {
-                uint32_t id = it->first;
-                DetectedBox box = it->second;
-                Eigen::Vector3d t_lidar_obj(box.x, box.y, box.z);
-                //w,x,y,z
-                Eigen::Quaterniond q_lidar_obj(cos(box.yaw/2), 0.0, sin(box.yaw/2), 0.0);
-                Eigen::Quaterniond q_w_obj = q_w_lidar * q_lidar_obj;
-                Eigen::Vector3d t_w_obj = q_w_lidar * t_lidar_obj + t_w_lidar;
-                nav_msgs::Odometry objOdom;
-                objOdom.header.frame_id = "/camera_init";
-                objOdom.header.stamp = ros::Time().fromSec(timeObjectArray);
-                objOdom.pose.pose.orientation.x = q_w_obj.x();
-                objOdom.pose.pose.orientation.y = q_w_obj.y();
-                objOdom.pose.pose.orientation.z = q_w_obj.z();
-                objOdom.pose.pose.orientation.w = q_w_obj.w();
-                objOdom.pose.pose.position.x = t_w_obj.x();
-                objOdom.pose.pose.position.y = t_w_obj.y();
-                objOdom.pose.pose.position.z = t_w_obj.z();
-                
-                if (pubObjectsOdomDict.find(id) == pubObjectsOdomDict.end())
-                {
-                    ros::Publisher pubObjOdom = nh.advertise<nav_msgs::Odometry>("/obj_"+std::to_string(id)+"_odom", 3);
-                    pubObjectsOdomDict[id] = pubObjOdom;
-                }
-                pubObjectsOdomDict[id].publish(objOdom);        
             }
+            //update last
+            boxesLast->header = boxesCurr->header;
+            boxesLast->boxes = boxesCurr->boxes;
+            
+            //publish
 
         }
         rate.sleep();

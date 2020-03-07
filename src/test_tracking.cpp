@@ -19,7 +19,7 @@
 #include "ros/node_handle.h"
 #include "ros/rate.h"
 
-#include "tracklet.h"
+#include "tracker.h"
 using std::atan2;
 using std::cos;
 using std::sin;
@@ -35,7 +35,7 @@ std::mutex mBuf;
 jsk_recognition_msgs::BoundingBoxArrayPtr boxesCurr(new jsk_recognition_msgs::BoundingBoxArray());
 pcl::PointCloud<PointType>::Ptr laserCloudIn(new pcl::PointCloud<PointType>());
 
-TrackletManager tracker;
+Tracker tracker;
 
 
 //lidar pose

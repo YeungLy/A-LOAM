@@ -33,6 +33,7 @@ class Tracklet
 
     Tracklet();
     Tracklet(const DetectedBox & det, const int & start_frame, const int & id);
+    ~Tracklet();
 
     //predict object at current frame's position
     void predict();
@@ -57,15 +58,15 @@ class Tracklet
      
 };
 
-class TrackletManager
+class Tracker
 {
 
     public:
   
     //association DetectedBoxs at current frame to existed tracklets
    //unmatched : assign the bool value to unmatch
-    TrackletManager();
-    ~TrackletManager();
+    Tracker();
+    ~Tracker();
     
     std::vector< std::vector<double> > CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes);
     

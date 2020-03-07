@@ -10,21 +10,30 @@
 
 #include "KalmanFilter.h"
 
-KalmanFilter::KalmanFilter(
+KalmanFilter::KalmanFilter() {}
+
+void KalmanFilter::setParameters(
     double dt,
     const Eigen::MatrixXd& F,
     const Eigen::MatrixXd& H,
     const Eigen::MatrixXd& Q,
     const Eigen::MatrixXd& R,
     const Eigen::MatrixXd& P)
-  : F(F), H(H), Q(Q), R(R), P0(P),
-    nz(H.rows()), nx(F.rows()), dt(dt), initialized(false),
-    I(nx, nx), x_hat(nx), x_hat_new(nx)
 {
-  I.setIdentity();
+    this->F = F;
+    this->H = H;
+    this->Q = Q;
+    this->R = R;
+    this->P0 = P;
+    this->nz = H.rows();
+    this->nx = F.rows();
+    this->dt = dt;
+    this->initialized = false;
+    this->I = Eigen::MatrixXd::Identity(nx, nx); 
+    this->x_hat = Eigen::VectorXd(nx);
+    this->x_hat_new = Eigen::VectorXd(nx);
 }
 
-KalmanFilter::KalmanFilter() {}
 
 void KalmanFilter::init(double t0, const Eigen::VectorXd& x0) {
   x_hat = x0;
@@ -56,9 +65,15 @@ void KalmanFilter::predcit() {
 void KalmanFilter::update(const Eigen::VectorXd& z) {
 
   //update
+  std::cout << "updating K " << std::endl;
   K = P*H.transpose()*(H*P*H.transpose() + R).inverse();
+  std::cout << K << std::endl;
+  std::cout << "updating x_hat " << std::endl;
   x_hat_new += K * (z - H*x_hat_new);
+  std::cout << x_hat_new << std::endl;
+  std::cout << "updating P " << std::endl;
   P = (I - K*H)*P;
+  std::cout << P << std::endl;
   x_hat = x_hat_new;
 
   t += dt;

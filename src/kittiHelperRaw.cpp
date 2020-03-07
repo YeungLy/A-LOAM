@@ -24,10 +24,11 @@
 #include <jsk_recognition_msgs/BoundingBox.h>
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
  
+#include "kitti/utils.h"
 #include "kitti/tracklets.h"
 
 
-
+/*
 std::vector<float> read_lidar_data(const std::string lidar_data_path)
 {
     std::ifstream lidar_data_file(lidar_data_path, std::ifstream::in | std::ifstream::binary);
@@ -147,6 +148,7 @@ void loadObjectLabelToVelo(const std::string label_path, const Eigen::Matrix<dou
 
     }
 }
+*/
 
 int main(int argc, char** argv)
 {
