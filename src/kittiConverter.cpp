@@ -4,6 +4,7 @@
  * */
 
 #include "kitti/utils.h"
+#include "kitti/box_utils.h"
 #include <cmath>
 #include <opencv2/calib3d.hpp>
 #include <string>

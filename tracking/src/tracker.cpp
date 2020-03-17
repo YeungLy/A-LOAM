@@ -3,93 +3,6 @@
 #include "iou.h"
 #include <glog/logging.h>
 
-Tracklet::Tracklet(const DetectedBox & det, const int & start_frame, const int & id){
-    start_frame_ = start_frame;
-    age_ = 1;
-    id_ = id;
-    history_.clear();
-    history_.push_back(det);
-
-    //Setting KalmanFilter parameters
-    int nx = 10;  //state dimensions
-    int nz = 7;   //measurement dimensions
-    Eigen::MatrixXd F = Eigen::MatrixXd::Identity(nx, nx);
-    F.topRightCorner(3, 3) = Eigen::MatrixXd::Identity(3, 3);
-    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(nz, nx);
-    H.topLeftCorner(nz, nz) = Eigen::MatrixXd::Identity(nz, nz);
-    Eigen::MatrixXd P0 = Eigen::MatrixXd::Identity(nx, nx);
-    P0.bottomRightCorner(3, 3) *= 1000.;
-    P0 *= 10.;
-    Eigen::MatrixXd R = Eigen::MatrixXd::Identity(nz, nz);
-    Eigen::MatrixXd Q = Eigen::MatrixXd::Identity(nx, nx);
-    Q.topLeftCorner(7, 7) *= 0.01;
-
-    //how to set init speed?
-    double vx, vy, vz;
-    vz = 0.01;
-    // yaw: (-pi, 0) at y-positive, (0, pi) at y-negative
-    // yaw: (-pi/2, pi/2) at x-positive, (-pi, -pi/2) and (pi/2, pi) at x-negative
-    LOG(INFO) << "[Tracklet::Tracklet] init state, yaw: " << history_[0].yaw << ", sin value: " << sin(history_[0].yaw) << ", cos: " << cos(history_[0].yaw);
-    double direction_x = cos(history_[0].yaw) >= 0 ? 1.0 : -1.0;
-    double direction_y = sin(history_[0].yaw) <= 0 ? 1.0 : -1.0;
-    vx = direction_x * 1.0;
-    vy = direction_y * 1.0;
-    
-    Eigen::VectorXd init_state(nx);
-    init_state << history_[0].x, history_[0].y, history_[0].z, 
-                  history_[0].l, history_[0].w, history_[0].h, history_[0].yaw,
-                  vx, vy, vz;
-    kf_.setParameters(0.0, F, H, Q, R, P0);
-    kf_.init(start_frame, init_state);
-    
-}
-void Tracklet::predict()
-{
-    kf_.predcit();
-    DetectedBox curr_box = history_.back();
-    DetectedBox pred_box;
-    pred_box.x = kf_.state()(0);
-    pred_box.y = kf_.state()(1);
-    pred_box.z = kf_.state()(2);
-    pred_box.l = kf_.state()(3);
-    pred_box.w = kf_.state()(4);
-    pred_box.h = kf_.state()(5);
-    pred_box.yaw = kf_.state()(6);
-    history_.push_back(pred_box);
-    matched_ = false;   //reset to false for next new frame
-    LOG(INFO) << "[Tracklet::predict] id: " << id_ <<", velocity: vx=" << kf_.x_hat(7) <<", vy=" << kf_.x_hat(8) << ", vz=" << kf_.x_hat(9) <<"\npredict next frame box : " << pred_box.getPrintString() <<", from current frame box: " << curr_box.getPrintString();
-    //LOG(INFO) << "[Tracklet::predict] id: " << id_  << ", kf_.x_hat \n" << kf_.x_hat <<"\nkf_.x_hat\n" << kf_.x_hat;
-    //LOG_IF(INFO, id_ == 1) << "[Tracklet::predict] KF: predict next frame box: " << pred_box.getPrintString() <<", from current frame box: " << curr_box.getPrintString(); 
-}
-void Tracklet::update(const DetectedBox & det)
-{
-    Eigen::VectorXd measurement(kf_.nz);
-    measurement << det.x, det.y, det.z, det.l, det.w, det.h, det.yaw;
-    kf_.update(measurement);
-    //LOG_IF(INFO, id_ == 1) << "[Tracklet::update] KF: update predicted box by measurment: " << det.getPrintString() << ", predicted box: " << history_.back().getPrintString(); 
-    //LOG(INFO) << "[Tracklet::update] KF: update predicted box by measurment: " << det.getPrintString() << ", predicted box: " << history_.back().getPrintString(); 
-       
-    size_t now = history_.size() - 1;
-    history_[now].x = kf_.state()(0);
-    history_[now].y = kf_.state()(1);
-    history_[now].z = kf_.state()(2);
-    history_[now].l = kf_.state()(3);
-    history_[now].w = kf_.state()(4);
-    history_[now].h = kf_.state()(5);
-    history_[now].yaw = kf_.state()(6);
-    //LOG_IF(INFO, id_ == 1) << "[Tracklet::update] after KF update: " << history_.back().getPrintString();
-    //LOG(INFO) << "[Tracklet::update] after KF update: " << history_.back().getPrintString();
-
-}
-
-DetectedBox Tracklet::getLatestBox() const 
-{
-    return history_.back();
-}
-bool Tracklet::isStable() const 
-{
-    return age_ > 2;
-}
 Tracker::Tracker()
 {
 
@@ -106,61 +19,61 @@ Tracker::~Tracker()
     google::ShutdownGoogleLogging();
 
 }
-void Tracker::AddTracklet(const DetectedBox & first_box, const int & start_frame)
+void Tracker::AddTrack(const DetectedBox & first_box, const int & start_frame)
 {
-    LOG(INFO) << "[AddTracklet] create new tracklet at frame: " <<start_frame << ", id=tracklets_count_ : " << tracklets_count_;
-    Tracklet track(first_box, start_frame, tracklets_count_);
+    LOG(INFO) << "[AddTrack] create new Track at frame: " <<start_frame << ", id=tracks_count_ : " << tracks_count_;
+    Track track(first_box, start_frame, tracks_count_);
     track.matched_ = true;  //intialized state.
-    tracklets_count_ += 1;
-    tracklets_.push_back(track);
+    tracks_count_ += 1;
+    tracks_.push_back(track);
 }
-void Tracker::AddTracklet(const DetectedBox & first_box, const int & start_frame, int id)
+void Tracker::AddTrack(const DetectedBox & first_box, const int & start_frame, int id)
 {
-    LOG(INFO) << "[AddTracklet] create new tracklet at frame: " <<start_frame << ", id: " << id;
-    Tracklet track(first_box, start_frame, id);
-    tracklets_count_ += 1;
-    tracklets_.push_back(track);
+    LOG(INFO) << "[AddTrack] create new Track at frame: " <<start_frame << ", id: " << id;
+    Track track(first_box, start_frame, id);
+    tracks_count_ += 1;
+    tracks_.push_back(track);
 }
 
-bool Tracker::DelTracklet(const int & target_id)
+bool Tracker::DelTrack(const int & target_id)
 {
-    for (size_t i = 0; i < tracklets_.size(); ++i)
+    for (size_t i = 0; i < tracks_.size(); ++i)
     {
-        if (tracklets_[i].id_ == target_id)
+        if (tracks_[i].id_ == target_id)
         {
-            tracklets_.erase(tracklets_.begin() + i);
-            LOG(INFO) << "[DelTracklet]Delete tracklet succeeded, id: " << target_id;
+            tracks_.erase(tracks_.begin() + i);
+            LOG(INFO) << "[DelTrack]Delete Track succeeded, id: " << target_id;
             return true;
         }
     }
-    LOG(INFO) << "[DelTracklet]Delete tracklet failed, can not find id: " << target_id;
+    LOG(INFO) << "[DelTrack]Delete Track failed, can not find id: " << target_id;
     return false;        
 }
 
-int Tracker::GetTrackletIndex(const int & target_id)
+int Tracker::GetTrackIndex(const int & target_id)
 {
-    for (int i = 0; i < tracklets_.size(); ++i)
+    for (int i = 0; i < tracks_.size(); ++i)
     {
-        if (tracklets_[i].id_ == target_id)
+        if (tracks_[i].id_ == target_id)
             return i;
     }
     return -1;
 }
 
-void Tracker::CleanUpTracklets()
+void Tracker::CleanUpTracks()
 {
-    //Add miss count to unmatched tracklets, delete those disappearing tracklets. 
-    for (int i = 0; i < tracklets_.size(); ++i)
+    //Add miss count to unmatched Tracks, delete those disappearing Tracks. 
+    for (int i = 0; i < tracks_.size(); ++i)
     {
-        if (!tracklets_[i].matched_)
+        if (!tracks_[i].matched_)
         {//maybe unmatched because of THRESHOLD or n_curr is smaller than n_pred.
-            LOG(INFO) << "[CleanUpTracklets]tracklet id: " << tracklets_[i].id_ << " is unmatched.";
-            tracklets_[i].miss_count_++;
-            if (tracklets_[i].miss_count_ >= MAX_MISS_COUNT)
+            LOG(INFO) << "[CleanUpTracks]Track id: " << tracks_[i].id_ << " is unmatched.";
+            tracks_[i].miss_count_++;
+            if (tracks_[i].miss_count_ >= MAX_MISS_COUNT)
             {
-                LOG(INFO) << "[CleanUpTracklets]tracklet id: " << tracklets_[i].id_ << " equals to MAX_MISS_COUNT, delete it!";
-                tracklets_.erase(tracklets_.begin() + i);
-                //DelTracklet(tracklets_[i].id_);
+                LOG(INFO) << "[CleanUpTracks]Track id: " << tracks_[i].id_ << " equals to MAX_MISS_COUNT, delete it!";
+                tracks_.erase(tracks_.begin() + i);
+                //DelTrack(tracks_[i].id_);
                 --i;
             }
         }
@@ -245,9 +158,9 @@ void Tracker::UpdateGT(const std::vector<DetectedBox> & curr_boxes)
     //update boxes_gt (has labels, so dont have to do data association)
     LOG(INFO) << "[UpdateGT] Updating Tracker by curr_boxes at frame " << frame_idx_<< " with gt label";
  
-    for (int i = 0; i < tracklets_.size(); ++i)
+    for (int i = 0; i < tracks_.size(); ++i)
     {
-        tracklets_[i].predict();
+        tracks_[i].predict();
     }
     if (curr_boxes.size() == 0)
     {
@@ -255,31 +168,31 @@ void Tracker::UpdateGT(const std::vector<DetectedBox> & curr_boxes)
     }
     for (int i = 0; i < curr_boxes.size(); ++i)
     {
-        int index = GetTrackletIndex(curr_boxes[i].id);
+        int index = GetTrackIndex(curr_boxes[i].id);
         if (index == -1)
         {
             //new box
-            AddTracklet(curr_boxes[i], frame_idx_, curr_boxes[i].id);
+            AddTrack(curr_boxes[i], frame_idx_, curr_boxes[i].id);
         }
         else 
         {
-            //LOG(INFO) << "[UpdateGT] updating tracklet: " << tracklets_[index].id_ <<", box: " << tracklets_[index].getLatestBox().getPrintString() << " using curr box: " << curr_boxes[i].getPrintString();
-            tracklets_[index].update(curr_boxes[i]);
-            tracklets_[index].matched_ = true;
+            //LOG(INFO) << "[UpdateGT] updating Track: " << tracks_[index].id_ <<", box: " << tracks_[index].getLatestBox().getPrintString() << " using curr box: " << curr_boxes[i].getPrintString();
+            tracks_[index].update(curr_boxes[i]);
+            tracks_[index].matched_ = true;
         }
     }
-    CleanUpTracklets();
+    CleanUpTracks();
     frame_idx_++;
 }
 void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
 {
     LOG(INFO) << "[Update] Updating Tracker by curr_boxes at frame " << frame_idx_;
 
-    //predict each tracklet's state at current frame unless tracklets_.size == 0
+    //predict each Track's state at current frame unless tracks_.size == 0
     //
-    if (tracklets_.size() == 0)
+    if (tracks_.size() == 0)
     {
-        LOG(INFO) << "[Update] No tracklet, still initializing";
+        LOG(INFO) << "[Update] No Track, still initializing";
         if (curr_boxes.size() == 0)
             LOG(INFO) << "[Update] No box detected at current frame ";
         else
@@ -287,9 +200,9 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
         frame_idx_++;
         return;
     }
-    for (int i = 0; i < tracklets_.size(); ++i)
+    for (int i = 0; i < tracks_.size(); ++i)
     {
-        tracklets_[i].predict();
+        tracks_[i].predict();
     }
 
     if (curr_boxes.size() == 0)
@@ -298,30 +211,20 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
     }
     else
     {
-        //tracklets_.size() != 0 && curr_boxes.size() != 0, match them and update tracklets!
+        //tracks_.size() != 0 && curr_boxes.size() != 0, match them and update Tracks!
 
-        LOG(INFO) << "[Update] Updating " << tracklets_.size() << " tracklet(s) state by " << curr_boxes.size() <<" current_boxes";
+        LOG(INFO) << "[Update] Updating " << tracks_.size() << " Track(s) state by " << curr_boxes.size() <<" current_boxes";
         std::vector<DetectedBox> pred_boxes;
-        std::vector<int>tracklets_id;
-        for (size_t i = 0; i < tracklets_.size(); ++i)
+        for (size_t i = 0; i < tracks_.size(); ++i)
         {
-            pred_boxes.push_back(tracklets_[i].getLatestBox());
-            tracklets_id.push_back(tracklets_[i].id_);
+            pred_boxes.push_back(tracks_[i].getLatestBox());
         }
-        /*
-        //print out curr boxes informaiton.
-        for (size_t i = 0; i < curr_boxes.size(); ++i)
-        {
-            LOG(INFO) << "[Update] curr boxes i: " << i << ", " << curr_boxes[i].getPrintString();
-        }
-        */
-
         //calculate distance matrix
         LOG(INFO) << "Calculating distance between curr(i) and pred(j):";
         std::vector< std::vector<double> > dist = CreateDistanceMatrix(curr_boxes, pred_boxes);
         std::vector<int> assignment;
         matcher_.Solve(dist, assignment);
-        //if n_curr < n_pred, then there must has some unmatched tracklets
+        //if n_curr < n_pred, then there must has some unmatched Tracks
         //if n_curr > n_pred, then there must has some unmatched boxes
         //if n_curr == n_pred, there may be some unmatched boxes because of THRESHOLD
 
@@ -333,28 +236,28 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
             int i_pred = assignment[i_curr];
             if (i_pred == -1)
             {//unmatched i_curr
-                LOG(INFO) << "[Update] i_curr " << i_curr << " is missed during matching, because n_pred: " << tracklets_.size() <<" < n_curr: " << curr_boxes.size();
+                LOG(INFO) << "[Update] i_curr " << i_curr << " is missed during matching, because n_pred: " << tracks_.size() <<" < n_curr: " << curr_boxes.size();
                 //n_curr > n_pred
                 curr_unmatched_boxes.push_back(curr_boxes[i_curr]);
                 continue;
             }
             //LOG(INFO) << "[Update] matching result: i_curr " << i_curr <<" to i_pred " << i_pred << ", dist: " << dist[i_curr][i_pred]; 
-            if (!tracklets_[i_pred].isStable())
+            if (!tracks_[i_pred].isStable())
                 dist_threshold = MAX_DIST_NEWBORN;
             if (dist[i_curr][i_pred] >= dist_threshold)
             {
                 //unmatched.
-                LOG(INFO) << "[Update]match failed for curr_box id: " << i_curr << " and tracklet id: " << tracklets_[i_pred].id_ <<", distance: " << dist[i_curr][i_pred];
+                LOG(INFO) << "[Update]match failed for curr_box id: " << i_curr << " and Track id: " << tracks_[i_pred].id_ <<", distance: " << dist[i_curr][i_pred];
                 //add to curr_unmatched_boxes
                 curr_unmatched_boxes.push_back(curr_boxes[i_curr]);
             }
             else
             {
                 //matched
-                LOG(INFO) << "[Update]match succeeded for curr_box id: " << i_curr << " and tracklet id: " << tracklets_[i_pred].id_ <<", distance: " << dist[i_curr][i_pred];
-                tracklets_[i_pred].update(curr_boxes[i_curr]);
-                tracklets_[i_pred].miss_count_ = 0;
-                tracklets_[i_pred].matched_ = true;
+                LOG(INFO) << "[Update]match succeeded for curr_box id: " << i_curr << " and Track id: " << tracks_[i_pred].id_ <<", distance: " << dist[i_curr][i_pred];
+                tracks_[i_pred].update(curr_boxes[i_curr]);
+                tracks_[i_pred].miss_count_ = 0;
+                tracks_[i_pred].matched_ = true;
             }
         }
 
@@ -365,7 +268,7 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
         }
     }
 
-    CleanUpTracklets();
+    CleanUpTracks();
     frame_idx_++;
 }
 
@@ -448,8 +351,8 @@ void Tracker::CheckNewbornObjects(const std::vector<DetectedBox> & curr_boxes)
         else if (newborn_objects_age_[i] == MIN_HIT_COUNT)
         {
             //matched.. and age is qualified.
-            LOG(INFO) << "[CheckNewbornObjects]new born object found, add it to tracklets!";
-            AddTracklet(newborn_objects_[i], frame_idx_);
+            LOG(INFO) << "[CheckNewbornObjects]new born object found, add it to Tracks!";
+            AddTrack(newborn_objects_[i], frame_idx_);
             newborn_objects_.erase(newborn_objects_.begin() + i);
             newborn_objects_age_.erase(newborn_objects_age_.begin() + i);
             updated.erase(updated.begin() + i);
@@ -466,10 +369,10 @@ void Tracker::CheckNewbornObjects(const std::vector<DetectedBox> & curr_boxes)
 std::map<int, DetectedBox> Tracker::GetCurrentObjects()
 {
     std::map<int, DetectedBox> boxes;
-    for (size_t i = 0; i < tracklets_.size(); ++i)
+    for (size_t i = 0; i < tracks_.size(); ++i)
     {
-        DetectedBox curr_box = tracklets_[i].getLatestBox();
-        int id = tracklets_[i].id_;
+        DetectedBox curr_box = tracks_[i].getLatestBox();
+        int id = tracks_[i].id_;
         LOG_IF(INFO, id==5) << "id: " << id << ", curr box: " << curr_box.getPrintString() << ", at frame: " << frame_idx_;
         boxes[id] = curr_box;
     }

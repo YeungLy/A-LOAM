@@ -23,6 +23,7 @@
 
 #include "tracker.h"
 #include "kitti/utils.h"
+#include "kitti/box_utils.h"
 
 using std::atan2;
 using std::cos;

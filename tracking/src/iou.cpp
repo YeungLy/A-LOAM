@@ -1,7 +1,7 @@
 
 #include "iou.h"
 #include "Eigen/src/Geometry/AngleAxis.h"
-//#include "tracklet.h"
+
 
 #include <cmath>
 #include <vector>
@@ -188,6 +188,7 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
 //box3d to 8corners
 Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
 {
+    //it is coordinate-related, different coordinate system has different corner offset.
     //8corners: (x,y,z), 3*8
     Eigen::MatrixXd corners(3, 8);
     corners << box.l / 2., -box.l / 2., -box.l / 2., box.l / 2., box.l / 2., -box.l / 2., -box.l / 2., box.l / 2.,
