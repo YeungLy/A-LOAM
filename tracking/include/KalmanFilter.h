@@ -96,7 +96,7 @@ public:
   Eigen::MatrixXd I;
 
   // Estimated states
-  Eigen::VectorXd x_hat, x_hat_new;
+  Eigen::VectorXd x_hat;
 };
 
 #endif

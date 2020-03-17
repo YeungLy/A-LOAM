@@ -1,6 +1,7 @@
 
 #include "iou.h"
-#include "tracklet.h"
+#include "Eigen/src/Geometry/AngleAxis.h"
+//#include "tracklet.h"
 
 #include <cmath>
 #include <vector>
@@ -73,7 +74,7 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
     std::map<Eigen::Vector2d, char, MyCompareEigenVector2d> vertexes_exist;
     //std::cout << "[getIntersectArea] irec.corners: " << this->corners << std::endl;
     //std::cout << "[getIntersectArea] jrec.corners: " << rec.corners << std::endl;
-    
+    int last_j = 0;
     for (int i = 0; i < 4; ++i)
     {
         //is ith corner inside of rec? if yes, add to vertexes.
@@ -91,8 +92,9 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
         int iedge_b = (i + 1) % 4;
         double i_xmax, i_xmin, i_ymax, i_ymin;
         getMinMaxofTwoCorners(corners.col(iedge_a), corners.col(iedge_b), i_xmax, i_xmin, i_ymax, i_ymin);
-        for (int j = 0; j < 4; ++j)
+        for (int j = last_j, n = 0; n < 4; ++j, ++n)
         {
+            j = j % 4;
             //is jth edge intersect with ith edge?
             Eigen::Vector2d jedge = rec.edges.col(j);
             int jedge_a = j;
@@ -115,7 +117,7 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
                 //has intersection
                 if (eigen_vector2d_cross(iedge, jedge) == 0)
                 {
-                    std::cerr << "[getIntersectArea] intersect edge shouldnt be parallel!" << std::endl;
+                    std::cerr << "[iou.cpp, getIntersectArea] intersect edge shouldnt be parallel!" << std::endl;
                     //continue;
                 }
                 double t = eigen_vector2d_cross(ia_ja, jedge) / eigen_vector2d_cross(iedge, jedge);
@@ -124,6 +126,7 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
                     continue;
                 //std::cout << "[getIntersectArea] found a vertex of intersect area, " 
                 //  << "because iedge " << i <<" is intersect with jedge " << j << " by point " << intersect_point << std::endl;
+                last_j = j;
                 vertexes.push_back(intersect_point); //? how to deal with repeat ones?                                  
                 vertexes_exist[intersect_point] = 'y';
                 //next point might be on iedge_b inside point
@@ -132,7 +135,7 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
                 {
                     if (vertexes_exist.find(next_point) != vertexes_exist.end())
                     {
-                        std::cerr << "[getIntersectArea] still got repeat vertex?" << std::endl;
+                        std::cerr << "[iou.cpp, getIntersectArea] still got repeat vertex?" << std::endl;
                     }
                     vertexes.push_back(next_point);
                     vertexes_exist[next_point] = 'y';
@@ -182,27 +185,6 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
 
 
 
-
-/*
-std::vector<DetectedBox> RosMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayConstPtr boxes_msg)
-{
-
-    std::vector<DetectedBox> boxes;
-    for (size_t i = 0; i < boxes_msg->boxes.size(); ++i)
-    {
-        DetectedBox box;
-        box.x = boxes_msg->boxes[i].pose.position.x;
-        box.y = boxes_msg->boxes[i].pose.position.y;
-        box.z = boxes_msg->boxes[i].pose.position.z;
-        //box.yaw = boxes_msg->boxes[i].pose.orientation.
-        box.l = boxes_msg->boxes[i].dimensions.x;
-        box.w = boxes_msg->boxes[i].dimensions.y;
-        box.h = boxes_msg->boxes[i].dimensions.z;
-
-    }
-    return boxes;
-}
-*/
 //box3d to 8corners
 Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
 {
@@ -212,7 +194,12 @@ Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
                 -box.w / 2., -box.w / 2., box.w /2., box.w / 2., -box.w / 2., -box.w / 2., box.w /2., box.w / 2.,
                 0, 0, 0, 0, box.h, box.h, box.h, box.h;
 
-    Eigen::Quaterniond q(std::cos(box.yaw/2.), 0.0, 0.0, std::sin(box.yaw/2.));
+    Eigen::Quaterniond q;
+    Eigen::AngleAxisd rx(0.0, Eigen::Vector3d::UnitX());
+    Eigen::AngleAxisd ry(0.0, Eigen::Vector3d::UnitY());
+    Eigen::AngleAxisd rz(box.yaw, Eigen::Vector3d::UnitZ());
+    q = rx*ry*rz;
+    
     Eigen::Vector3d t(box.x, box.y, box.z);
     Eigen::MatrixXd r_mat = q.toRotationMatrix();
     Eigen::MatrixXd t_mat(3, 8);
@@ -232,46 +219,33 @@ double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox)
     Rectangle2D irec(corners3d.topLeftCorner(2, 4));
     corners3d = Box3dToCorners(jbox);
     Rectangle2D jrec(corners3d.topLeftCorner(2, 4));
-    //std::cout << "corners of irec: \n" << irec.corners << std::endl; 
-    //std::cout << "corners of jrec: \n" << jrec.corners << std::endl; 
+    std::cout << "corners of irec: \n" << irec.corners << std::endl; 
+    std::cout << "corners of jrec: \n" << jrec.corners << std::endl; 
         
     double sum = irec.getArea() + jrec.getArea();
     double inter = irec.getIntersectArea(jrec);
     std::cout << "[BoxIoUBev]union: " << sum <<" , inter: " << inter << std::endl;
     iou = inter / (sum - inter);
     std::cout << "[BoxIoUBev]iou: " << iou << std::endl;
+    if (iou > 1.0)
+        std::cerr << "[iou.cpp BoxIoUBev] invalid value of iou: "<< iou << "(>1.0.)! maybe because of wrong intersection area! " << std::endl;
     
     return iou;
 }
 
-std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxes, std::vector<DetectedBox> jBoxes)
+double CalculateIoU3d(const DetectedBox & iBox, const DetectedBox & jBox)
 {
-    std::vector< std::vector<double> > dist;
-    for (size_t i = 0; i < iBoxes.size(); ++i)
-    {
-        Eigen::MatrixXd ibox_corners3d = Box3dToCorners(iBoxes[i]);
-        Rectangle2D irec(ibox_corners3d.topLeftCorner(2, 4));
-        double ivol = irec.getArea() * iBoxes[i].h;
-        std::vector<double> dist_row;
-        for (size_t j = 0; j < jBoxes.size(); ++j)
-        {   
-            Eigen::MatrixXd jbox_corners3d = Box3dToCorners(jBoxes[j]);
-            Rectangle2D jrec(jbox_corners3d.topLeftCorner(2, 4));
-            double jvol = jrec.getArea() * jBoxes[j].h;
-            double inter_area = irec.getIntersectArea(jrec);
-            double inter_h = iBoxes[i].h < jBoxes[j].h ? iBoxes[i].h : jBoxes[j].h;
-            double inter_vol = inter_area * inter_h;
-            double iou = inter_vol / (ivol + jvol - inter_vol);
-            std::cout << "[CalculateIoU3d] i: " << i << ", boxes:" << iBoxes[i].getPrintString() 
-                      << "\nj: " << j << ", boxes: " << jBoxes[j].getPrintString() 
-                      << "\niou: " << iou << ", dist: " << 1 - iou << std::endl; 
-
-            dist_row.push_back(1 - iou);
-            //dist_row[j] = 1 - 0.02*i + 0.15*j;
-        }
-        dist.push_back(dist_row);
-    }
-    return dist;
+    Eigen::MatrixXd ibox_corners3d = Box3dToCorners(iBox);
+    Rectangle2D irec(ibox_corners3d.topLeftCorner(2, 4));
+    double ivol = irec.getArea() * iBox.h;
+    Eigen::MatrixXd jbox_corners3d = Box3dToCorners(jBox);
+    Rectangle2D jrec(jbox_corners3d.topLeftCorner(2, 4));
+    double jvol = jrec.getArea() * jBox.h;
+    double inter_area = irec.getIntersectArea(jrec);
+    double inter_h = iBox.h < jBox.h ? iBox.h : jBox.h;
+    double inter_vol = inter_area * inter_h;
+    double iou = inter_vol / (ivol + jvol - inter_vol);
+    return iou;
 }
 
  

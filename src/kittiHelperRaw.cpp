@@ -28,141 +28,22 @@
 #include "kitti/tracklets.h"
 
 
-/*
-std::vector<float> read_lidar_data(const std::string lidar_data_path)
-{
-    std::ifstream lidar_data_file(lidar_data_path, std::ifstream::in | std::ifstream::binary);
-    lidar_data_file.seekg(0, std::ios::end);
-    const size_t num_elements = lidar_data_file.tellg() / sizeof(float);
-    lidar_data_file.seekg(0, std::ios::beg);
-
-    std::vector<float> lidar_data_buffer(num_elements);
-    lidar_data_file.read(reinterpret_cast<char*>(&lidar_data_buffer[0]), num_elements*sizeof(float));
-    return lidar_data_buffer;
-}
-
-Eigen::Matrix<double, 4, 4> convertOxtsPose(std::vector<double> pose_data, double &scale)
-{
-    if (scale == 0)
-    {
-        scale = cos(pose_data[0] * M_PI / 180.0);
-    }
-    double er = 6378137;
-    double lat = pose_data[0];
-    double lon = pose_data[1];
-    double tx = scale * lon * M_PI * er / 180;
-    double ty = scale * er * log( tan((90+lat) * M_PI / 360) );
-    double tz = pose_data[2];
-    Eigen::Vector3d translation(tx, ty, tz);
-    double rx = pose_data[3]; //roll
-    double ry = pose_data[4]; //pitch
-    double rz = pose_data[5]; //heading
-    Eigen::AngleAxisd rollAngle(rx, Eigen::Vector3d::UnitX());
-    Eigen::AngleAxisd pitchAngle(ry, Eigen::Vector3d::UnitY());
-    Eigen::AngleAxisd yawAngle(rz, Eigen::Vector3d::UnitZ());
-    Eigen::Matrix3d rotation_matrix;
-    rotation_matrix = yawAngle * pitchAngle * rollAngle;
-    Eigen::Matrix<double, 4, 4> pose;
-    pose.topLeftCorner(3, 3) = rotation_matrix;
-    pose.topRightCorner(3, 1) = translation;
-    pose.bottomLeftCorner(1, 4) = Eigen::MatrixXd::Zero(1, 4);
-    pose(3, 3) = 1;
-    return pose;
-}
-
-void loadCalibrationRigid(const::std::string & calib_path, Eigen::Matrix<double, 4, 4> & calib)
-{
-    std::cout << "Loading calib file from: " << calib_path << std::endl;
-    std::ifstream calib_file(calib_path, std::ifstream::in);
-    std::string line;
-
-    while (std::getline(calib_file, line)) {
-        if (line.find("R:") == 0) {
-            line = line.substr(3);
-            std::stringstream ss(line);
-            double value;
-            for (int k = 0; k < 3 * 3; k++) {
-                if (ss >> value)
-                    calib(k / 3, k % 3) = value;
-                else
-                    break;
-            }
-        } else if (line.find("T:") == 0) {
-            line = line.substr(3);
-            std::stringstream ss(line);
-            double value;
-            for (int k = 0; k < 3; k++) {
-                if (ss >> value)
-                    calib(k, 3) = value;
-                else
-                    break;
-            }
-        }
-    }
-    calib.bottomRows(1) = Eigen::MatrixXd::Zero(1, 4);
-    calib(3, 3) = 1;
-}
-double convertStrDatetimetoTimestamp(const std::string & s)
-{
-    std::tm t{};
-    std::istringstream ss(s);
-    double ms;
-    ss >> std::get_time(&t, "%Y-%m-%d %H:%M:%S") >> ms;
-    if (ss.fail())
-    {
-        std::cout << "failed to parse time " << std::endl;
-        return -1.0;
-    }
-    std::time_t timestamp = timegm(&t);
-    double time_ms = timestamp*1.0 + ms;
-    return time_ms;
-}
-
-void loadObjectLabelToVelo(const std::string label_path, const Eigen::Matrix<double, 4, 4> & T_cam2_velo, std::vector<std::vector<double> > &objs)
-{
-    
-    //objs: (x, y, z, l, w, h, yaw), yaw at obj format is start from left(from camera-x positive axis), rz at tracklet format is start from head(from velo-x positive axis),  positive=clock counterwise
-    
-    std::ifstream label_file(label_path, std::ifstream::in);
-    std::string line;
-    while (std::getline(label_file, line)) 
-    {
-        std::stringstream ss(line);
-        double element;
-        std::vector<double> obj;
-        while (ss >> element && obj.size() < 7)
-            obj.push_back(element);
-        if (obj.size() != 7)
-            ROS_ERROR_STREAM("Loading label from " << label_path <<" wrong, there should be at least 7 numbers each line (x,y,z,h,w,l,ry).");
-        //transform to velo coordinate
-        Eigen::Vector4d pos_at_cam;
-        pos_at_cam << obj[0], obj[1], obj[2], 1.0;
-        Eigen::Vector4d pos_at_velo;
-        pos_at_velo = T_cam2_velo.inverse() * pos_at_cam;
-        pos_at_velo = pos_at_velo / pos_at_velo(3);
-        obj[0] = pos_at_velo(0);
-        obj[1] = pos_at_velo(1);
-        obj[2] = pos_at_velo(2);
-        obj[6] += M_PI/2;       //add pi/2.
-        objs.push_back(obj);
-
-    }
-}
-*/
 
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "kitti_helper_raw");
     ros::NodeHandle n("~");
-    std::string dataset_folder, output_bag_file;
+    std::string dataset_folder, output_bag_file, calib_folder, detections_subfolder;
     int num_frame = 5;
-    bool has_tracks_gt, has_detections;
+    bool pub_tracks_gt, pub_detections;
     n.getParam("num_frame", num_frame);
     n.getParam("dataset_folder", dataset_folder);
-    n.getParam("pub_tracks_gt", has_tracks_gt);
-    n.getParam("pub_detections", has_detections);
+    n.getParam("calib_folder", calib_folder);
+    n.getParam("pub_tracks_gt", pub_tracks_gt);
+    n.getParam("pub_detections", pub_detections);
+    n.getParam("detections_subfolder", detections_subfolder);
 
-    std::cout << "Reading from " << dataset_folder << '\n';
+    std::cout << "Reading from " << dataset_folder << ", using calib folder: " << calib_folder << "\n";
     bool to_bag;
     n.getParam("to_bag", to_bag);
     if (to_bag)
@@ -190,7 +71,7 @@ int main(int argc, char** argv)
 
     ros::Publisher pubTracksGT = n.advertise<jsk_recognition_msgs::BoundingBoxArray> ("/tracks_gt", 2);
     Tracklets tracklets;
-    if (has_tracks_gt)
+    if (pub_tracks_gt)
     {
         std::string tracklets_path = dataset_folder + "tracklet_labels.xml";
         if (!tracklets.loadFromFile(tracklets_path))
@@ -199,12 +80,10 @@ int main(int argc, char** argv)
     std::string timestamp_path = "velodyne_points/timestamps.txt";
     std::ifstream timestamp_file(dataset_folder + timestamp_path, std::ifstream::in);
 
-    std::string calib_path = dataset_folder + "../../../2011_09_26_calib/calib_imu_to_velo.txt";
-    Eigen::Matrix<double, 4, 4> T_velo_imu = Eigen::MatrixXd::Zero(4, 4);
-    loadCalibrationRigid(calib_path, T_velo_imu);
-    calib_path = dataset_folder + "../../../2011_09_26_calib/calib_velo_to_cam.txt";
-    Eigen::Matrix<double, 4, 4> Tr_cam0_velo = Eigen::MatrixXd::Zero(4, 4);
-    loadCalibrationRigid(calib_path, Tr_cam0_velo);
+    std::string calib_path = calib_folder + "calib_imu_to_velo.txt";
+    Eigen::Matrix<double, 4, 4> T_velo_imu = loadCalibrationRigid(calib_path);
+    calib_path = calib_folder + "calib_velo_to_cam.txt";
+    Eigen::Matrix<double, 4, 4> Tr_cam0_velo = loadCalibrationRigid(calib_path);
 
     Eigen::Matrix<double, 4, 4> R_rect_00;
     R_rect_00 << 9.999239e-01, 9.837760e-03, -7.445048e-03, 0,
@@ -224,8 +103,7 @@ int main(int argc, char** argv)
     T_cam2_velo = R_rect_02 * Tr_cam0_velo;
 
     //Eigen::Matrix<double, 4, 4> T_cam0_imu = T_cam0_velo * T_velo_imu;
-    //std::cout << "calib: \nT_velo_imu:\n" << T_velo_imu << "\nT_cam0_velo\n" << T_cam0_velo << "\nT_cam0_imu\n" << T_cam0_imu << std::endl;
-
+    //std::cout << "calib: \nT_velo_imu:\n" << T_velo_imu << "\nT_cam0_velo\n" << T_cam0_velo << std::endl;
     rosbag::Bag bag_out;
     if (to_bag)
         bag_out.open(output_bag_file, rosbag::bagmode::Write);
@@ -246,7 +124,7 @@ int main(int argc, char** argv)
     
     while (std::getline(timestamp_file, line) && ros::ok())
     {
-        std::cout << "process at line num : " << line_num << std::endl;
+        ROS_INFO_STREAM("process at frame : " << line_num);
         if (line_num > num_frame)
             break;
         double timestamp = convertStrDatetimetoTimestamp(line);
@@ -254,7 +132,6 @@ int main(int argc, char** argv)
             time_init = timestamp;
         timestamp -= time_init;
         //std::cout << "processing timestamp: " << std::setiosflags(std::ios::showpoint|std::ios::fixed) << std::setprecision(12) << timestamp << std::endl;
-
         std::stringstream left_image_path, right_image_path;
         left_image_path << dataset_folder << "image_02/data/" << std::setfill('0') << std::setw(10) << line_num << ".png";
         cv::Mat left_image = cv::imread(left_image_path.str(), CV_LOAD_IMAGE_GRAYSCALE);
@@ -275,7 +152,8 @@ int main(int argc, char** argv)
             if (pose_data.size() == 6)
                 break;
         }
-        /* oxts pose to velodyne pose. */
+        /* convert oxts pose to velodyne pose. 
+         * in raw sequence, we have to do this. but in odometry sequence as kittiHelper.cpp we dont have to convert. */
 
         Eigen::Matrix<double, 4, 4> pose = convertOxtsPose(pose_data, scale_init);
         if (line_num == 0)
@@ -283,15 +161,15 @@ int main(int argc, char** argv)
         //convert to relative pose, let first frame as reference frame.
         pose = pose_init_inv * pose;
         //std::cout << "imu pose:\n" << pose << std::endl;
-        //transform from oxts coodinate to velodyne coordinate
-        //a point at velo * (T_velo_imu).inverse() = a_point_at_imu
-        //a_point_at_imu * pose(t->0) = a_point_at_imu_at_reference_frame
-        //a_point_at_imu_at_reference_frame * T_velo_imu = a_point_at_velo_at_reference_frame
+        /*transform from oxts coodinate to velodyne coordinate
+         * a point at velo * (T_velo_imu).inverse() = a_point_at_imu
+         * a_point_at_imu * pose(t->0) = a_point_at_imu_at_reference_frame
+         * a_point_at_imu_at_reference_frame * T_velo_imu = a_point_at_velo_at_reference_frame
+         */
         pose = T_velo_imu * (pose * T_velo_imu.inverse());
         //std::cout << "velo pose:\n" << pose << std::endl;
-        //transform from oxts to cam0 coordiantes.
+        /* transform from velo to cam0 coordiantes. */
         //pose = T_cam0_velo * (pose * T_cam0_velo.inverse());
-        //std::cout << "cam0 pose:\n" << pose << std::endl;
 
         Eigen::Quaterniond q(pose.topLeftCorner<3, 3>());
         q.normalize();
@@ -320,21 +198,22 @@ int main(int argc, char** argv)
 
         // read detected_result
         jsk_recognition_msgs::BoundingBoxArray detections;
-        if (has_detections)
+        if (pub_detections)
         {
             detections.header.frame_id = "/camera_init";
             detections.header.stamp = ros::Time().fromSec(timestamp);
 
             std::stringstream label_path;
-            label_path << dataset_folder << "avod_result_obj_label/" << std::setfill('0') << std::setw(10) << line_num << ".txt";
+            label_path << dataset_folder << detections_subfolder << std::setfill('0') << std::setw(10) << line_num << ".txt";
+            //ROS_INFO_STREAM("loading detection results from : " << label_path.str() << " at frame: " << line_num);
             std::vector<std::vector<double> > objects;
+            //camera2 to velo coordinate
             loadObjectLabelToVelo(label_path.str(), T_cam2_velo, objects);
             for (size_t idx = 0; idx < objects.size(); idx++)
             {
-                Eigen::AngleAxisd rx(0.0, Eigen::Vector3d::UnitX());
-                Eigen::AngleAxisd ry(0.0, Eigen::Vector3d::UnitY());
-                Eigen::AngleAxisd rz(objects[idx][6], Eigen::Vector3d::UnitZ());
-                Eigen::Quaterniond q = rz*ry*rx;
+                Eigen::Vector3d euler(0.0, 0.0, objects[idx][6]); //(rx, ry, rz)
+                Eigen::Quaterniond q = euler_to_quaternion(euler);
+
                 jsk_recognition_msgs::BoundingBox bbox;
                 bbox.header.stamp = detections.header.stamp;
                 bbox.header.frame_id = detections.header.frame_id;
@@ -350,12 +229,13 @@ int main(int argc, char** argv)
                 bbox.dimensions.z = objects[idx][5];
                 detections.boxes.push_back(bbox);
             }
+            //ROS_INFO_STREAM("publishing detections size: " << objects.size() << " at frame: " << line_num);
             pubDetections.publish(detections);
         }
 
         // read tracklets
         jsk_recognition_msgs::BoundingBoxArray tracksGT;
-        if (has_tracks_gt)
+        if (pub_tracks_gt)
         {
         
             int frame_number = line_num;
@@ -367,17 +247,18 @@ int main(int argc, char** argv)
             {
                 if (!tracklets.isActive(id, frame_number))
                 {
-                    ROS_INFO_STREAM("id: " << id << ", frame number: " << frame_number << "no active!");
+                    //ROS_INFO_STREAM("id: " << id << ", frame number: " << frame_number << "no active!");
                     continue;
                 }
-                else
-                    ROS_INFO_STREAM("id: " << id << ", frame number: " << frame_number << "active!");
                 Tracklets::tTracklet * obj = tracklets.getTracklet(id);
                 tracklets.getPose(id, frame_number, obj_pose);
                 Eigen::AngleAxisd rx(obj_pose->rx, Eigen::Vector3d::UnitX());
                 Eigen::AngleAxisd ry(obj_pose->ry, Eigen::Vector3d::UnitY());
                 Eigen::AngleAxisd rz(obj_pose->rz, Eigen::Vector3d::UnitZ());
-                Eigen::Quaterniond q = rz*ry*rz;
+                Eigen::Quaterniond q = rx*ry*rz;
+
+                //ROS_INFO_STREAM("id: " << id << ", at frame: " << frame_number << "pose:(euler angle) " << q.toRotationMatrix().eulerAngles(0, 1, 2));
+
                 jsk_recognition_msgs::BoundingBox bbox;
                 bbox.header.stamp = tracksGT.header.stamp;
                 bbox.header.frame_id = tracksGT.header.frame_id;
@@ -393,8 +274,8 @@ int main(int argc, char** argv)
                 bbox.dimensions.z = obj->h;
                 //assgin ground_truth id to 'bbox.value' attribute 
                 //preserving 'bbox.label' empty for matching result by current frame and last frame.
-                bbox.value=id;  
-                //bbox.label = id;
+                //bbox.value=id;  
+                bbox.label = id;
                 tracksGT.boxes.push_back(bbox);
             }
             pubTracksGT.publish(tracksGT);
@@ -435,8 +316,6 @@ int main(int argc, char** argv)
         pub_image_left.publish(image_left_msg);
         pub_image_right.publish(image_right_msg);
 
-
-
         if (to_bag)
         {
             bag_out.write("/image_left", ros::Time::now(), image_left_msg);
@@ -444,9 +323,9 @@ int main(int argc, char** argv)
             bag_out.write("/velodyne_points", ros::Time::now(), laser_cloud_msg);
             bag_out.write("/path_gt", ros::Time::now(), pathGT);
             bag_out.write("/odometry_gt", ros::Time::now(), odomGT);
-            if (has_detections)
+            if (pub_detections)
                 bag_out.write("/object_boxes", ros::Time::now(), detections);
-            if (has_tracks_gt)
+            if (pub_tracks_gt)
                 bag_out.write("/tracks_gt", ros::Time::now(), tracksGT);
 
         }

@@ -70,6 +70,8 @@ target_link_libraries(alaserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES
 add_executable(kittiHelperRaw src/kittiHelperRaw.cpp)
 target_link_libraries(kittiHelperRaw ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
+add_executable(kittiConverter src/kittiConverter.cpp)
+target_link_libraries(kittiConverter ${catkin_LIBRARIES})
 #add_executable(pubTracklet src/pubTracklet.cpp)
 #target_link_libraries(pubTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${Boost_LIBRARIES})
 

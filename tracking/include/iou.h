@@ -66,6 +66,6 @@ double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox);
     return iou;
 }*/
 
-std::vector< std::vector<double> > CalculateIoU3d(std::vector<DetectedBox> iBoxes, std::vector<DetectedBox> jBoxes);
+double CalculateIoU3d(const DetectedBox & iBox, const DetectedBox & jBox);
 
 #endif
