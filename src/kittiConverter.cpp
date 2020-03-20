@@ -50,6 +50,10 @@ int main(int argc, char** argv)
     std::cout << "param: " 
               << "topic: " << topic << ", calib_folder: " << calib_folder << ", output_folder " << output_folder << ", num_frame " << num_frame << ", output_timestamps " << output_timestamps << std::endl;
 
+    std::stringstream label_path;
+    label_path << output_folder << "0001.txt"; 
+    std::ofstream label_file(label_path.str(), std::ofstream::out);
+ 
     std::string calib_path = calib_folder + "calib_velo_to_cam.txt";
 
     Eigen::Matrix<double, 4, 4> Tr_cam0_velo = loadCalibrationRigid(calib_path);
@@ -61,11 +65,11 @@ int main(int argc, char** argv)
     
     frame_idx = 0;
 
-    std::cout <<"T_cam0_velo:\n " << T_cam0_velo << std::endl;
-    std::cout << "Output result from " << topic << " as kitti tracking label format at path: " << output_folder << std::endl;
+    std::cout << "Output result from " << topic << " as kitti tracking label format at path: " << label_path.str() << std::endl;
 
     ros::Subscriber subTracks = nh.subscribe<jsk_recognition_msgs::BoundingBoxArray>(topic, 100, tracksHandler);
     
+    std::map<int, std::vector<std::string> > all_tracks_labels;
 
     ros::Rate rate(100);
     
@@ -85,16 +89,11 @@ int main(int argc, char** argv)
             if (frame_idx == num_frame)
                 break;
 
-            std::stringstream label_path;
-            label_path << output_folder << std::setfill('0') << std::setw(4) << frame_idx << ".txt"; 
-            std::ofstream label_file(label_path.str(), std::ofstream::out);
             Eigen::Matrix<double, 7, 1> box3d;
             Eigen::Matrix<double, 4, 1> box2d;
             ROS_INFO_STREAM("[kittiConverter]processing boxes: " << tracks.boxes.size() << " to label file: " << label_path.str() ); 
             for (int i = 0; i < tracks.boxes.size(); ++i)
             {
-                if (i > 0)
-                    break;
                 std::stringstream label;
                 jsk_recognition_msgs::BoundingBox box = tracks.boxes[i];
                 double qx = box.pose.orientation.x;
@@ -125,7 +124,10 @@ int main(int argc, char** argv)
                 double right = projected_box3d.row(0).maxCoeff();
                 double top = projected_box3d.row(1).minCoeff();
                 double bottom = projected_box3d.row(1).maxCoeff();
-                label << frame_idx << " " << tracks.boxes[i].label << " Car 0 0 0 " 
+                int id = tracks.boxes[i].label;
+                //int id = 0;
+                label << frame_idx << " " << id
+                      << " Car 0 0 0 " 
                       << left << " " << top << " " << right << " " << bottom << " "
                       << box3d(5) << " " << box3d(4) << " " << box3d(3) << " "
                       << box3d(0) << " " << box3d(1) << " " << box3d(2) << " "
@@ -133,9 +135,13 @@ int main(int argc, char** argv)
                 ROS_INFO_STREAM("[kittiConverter] frame: " << frame_idx << ", row: " << i << ", label: " << label.str() );
                 label_file << label.str() << "\n";
             }
-            label_file.close();
             frame_idx++;
         }
         rate.sleep();
     }
+
+    /* write to file.*/
+    label_file.close();
+    return 0;
+
 }

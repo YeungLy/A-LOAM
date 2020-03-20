@@ -6,6 +6,7 @@
 
 
 struct DetectedBox{
+    //measurement.
     double x, y, z;
     double l, w, h;
     double yaw;
@@ -29,6 +30,11 @@ struct DetectedBox{
     {
         return l > 0 && w > 0 && h > 0;
     }
+    Eigen::Matrix<double, 7, 1> getEigenMatrix() const
+    {
+        Eigen::Matrix<double, 7, 1> data;
+        data << x, y, z, l, w, h, yaw;
+    }
 
 };
         
@@ -47,18 +53,18 @@ class Track
     void update(const DetectedBox & det);
 
     DetectedBox getLatestBox() const; 
-    bool isStable() const;
+    bool isAlive(int current_frame) const;
 
 
     std::vector<DetectedBox> history_;   // (x, y, z, l, w, h, yaw)
-    
+    //stage: [Init, Tracking, Lost, Dead] 
+    std::string stage_;
     //first occur frame index
     int start_frame_;   
-    //number of appear frames
-    int age_;      
+    int end_frame_;
     //keep disappearing frame counts
     int miss_count_ = 0;  
-    bool matched_ = false;
+    bool updated_ = false;
 
     int id_;
     //std::vector<double> params_; //(vx, vy, vz) ?

@@ -79,7 +79,6 @@ Eigen::Matrix<double, 4, 4>  loadCalibrationRigid(const::std::string & calib_pat
             }
         }
     }
-    std::cout << "loading finish, calib: " << calib << std::endl;
     return calib;
 }
 double convertStrDatetimetoTimestamp(const std::string & s)
@@ -132,17 +131,13 @@ void loadObjectLabelToVelo(const std::string label_path, const Eigen::Matrix<dou
 
 Eigen::MatrixXd loadCalibrationCamera(std::string calib_name)
 {
-    std::cout << "loading cam calib_name: " << calib_name << std::endl;
     Eigen::MatrixXd calib;
-    //std::cout << calib_name.compare("R_rect_00") <<std::endl;
     if (calib_name == "R_rect_00") {
-        std::cout << calib_name << std::endl;
         calib.resize(4, 4);
         calib << 9.999239e-01, 9.837760e-03, -7.445048e-03, 0,
             -9.869795e-03, 9.999421e-01, -4.278459e-03, 0,
             7.402527e-03, 4.351614e-03, 9.999631e-01, 0,
             0, 0, 0, 1;
-        std::cout << calib << std::endl;
     }
     else if (calib_name == "R_rect_02") {
         calib.resize(4, 4);
@@ -168,7 +163,6 @@ Eigen::MatrixXd loadCalibrationCamera(std::string calib_name)
                  0.000000e+00, 7.215377e+02, 1.728540e+02, 2.163791e-01,
                  0.000000e+00, 0.000000e+00, 1.000000e+00, 2.745884e-03;
     }
-    std::cout << "loading cam finish, calib: " << calib << std::endl;
     return calib;
 
 }

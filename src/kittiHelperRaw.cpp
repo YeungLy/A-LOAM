@@ -25,6 +25,7 @@
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
  
 #include "kitti/utils.h"
+#include "kitti/box_utils.h"
 #include "kitti/tracklets.h"
 
 
@@ -127,6 +128,12 @@ int main(int argc, char** argv)
         ROS_INFO_STREAM("process at frame : " << line_num);
         if (line_num > num_frame)
             break;
+        else if (line.size() == 0)
+        {
+            line_num++;
+            continue;
+        }
+        
         double timestamp = convertStrDatetimetoTimestamp(line);
         if (line_num == 0)
             time_init = timestamp;

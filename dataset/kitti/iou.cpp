@@ -185,40 +185,15 @@ double Rectangle2D::getIntersectArea(Rectangle2D & rec)
 
 
 
-//box3d to 8corners
-Eigen::MatrixXd Box3dToCorners(const DetectedBox & box)
-{
-    //it is coordinate-related, different coordinate system has different corner offset.
-    //8corners: (x,y,z), 3*8
-    Eigen::MatrixXd corners(3, 8);
-    corners << box.l / 2., -box.l / 2., -box.l / 2., box.l / 2., box.l / 2., -box.l / 2., -box.l / 2., box.l / 2.,
-                -box.w / 2., -box.w / 2., box.w /2., box.w / 2., -box.w / 2., -box.w / 2., box.w /2., box.w / 2.,
-                0, 0, 0, 0, box.h, box.h, box.h, box.h;
-
-    Eigen::Quaterniond q;
-    Eigen::AngleAxisd rx(0.0, Eigen::Vector3d::UnitX());
-    Eigen::AngleAxisd ry(0.0, Eigen::Vector3d::UnitY());
-    Eigen::AngleAxisd rz(box.yaw, Eigen::Vector3d::UnitZ());
-    q = rx*ry*rz;
-    
-    Eigen::Vector3d t(box.x, box.y, box.z);
-    Eigen::MatrixXd r_mat = q.toRotationMatrix();
-    Eigen::MatrixXd t_mat(3, 8);
-    t_mat << t, t, t, t, t, t, t, t;
-    corners = r_mat * corners + t_mat;
-    //std::cout << "8 3D corners of box:  \n" << corners << std::endl;
-
-    return corners;
-}
-double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox)
+double BoxIoUBev(const Eigen::Matrix<double, 7, 1> & ibox3d, const Eigen::Matrix<double, 7, 1> & jbox3d, std::string coordinate)
 {
     
     //LOG(INFO) << "start get Box IoU at BEV";
     //icorners: 2*4, jcorners: 2*4, four 2D box corner points in clockwise.
     double iou;
-    Eigen::MatrixXd corners3d = Box3dToCorners(ibox);
+    Eigen::MatrixXd corners3d = convertBox3Dto8corners(ibox3d, coordinate);
     Rectangle2D irec(corners3d.topLeftCorner(2, 4));
-    corners3d = Box3dToCorners(jbox);
+    corners3d = convertBox3Dto8corners(jbox3d, coordinate);
     Rectangle2D jrec(corners3d.topLeftCorner(2, 4));
     std::cout << "corners of irec: \n" << irec.corners << std::endl; 
     std::cout << "corners of jrec: \n" << jrec.corners << std::endl; 
@@ -234,20 +209,22 @@ double BoxIoUBev(const DetectedBox & ibox, const DetectedBox & jbox)
     return iou;
 }
 
-double CalculateIoU3d(const DetectedBox & iBox, const DetectedBox & jBox)
+double CalculateIoU3d(const Eigen::Matrix<double, 7, 1> & ibox3d, const Eigen::Matrix<double, 7, 1> & jbox3d, std::string coordinate)
 {
-    Eigen::MatrixXd ibox_corners3d = Box3dToCorners(iBox);
-    Rectangle2D irec(ibox_corners3d.topLeftCorner(2, 4));
-    double ivol = irec.getArea() * iBox.h;
-    Eigen::MatrixXd jbox_corners3d = Box3dToCorners(jBox);
-    Rectangle2D jrec(jbox_corners3d.topLeftCorner(2, 4));
-    double jvol = jrec.getArea() * jBox.h;
+    //box3d: (x, y, z, l, w, h, yaw)
+    double ibox3d_h = ibox3d(5);
+    double jbox3d_h = jbox3d(5);
+    Eigen::MatrixXd ibox3d_corners = convertBox3Dto8corners(ibox3d, coordinate);
+    Rectangle2D irec(ibox3d_corners.topLeftCorner(2, 4));
+    double ivol = irec.getArea() * ibox3d_h;
+    Eigen::MatrixXd jbox3d_corners = Box3dToCorners(jbox3d, coordinate);
+    Rectangle2D jrec(jbox3d_corners.topLeftCorner(2, 4));
+    double jvol = jrec.getArea() * jbox3d_h;
     double inter_area = irec.getIntersectArea(jrec);
-    double inter_h = iBox.h < jBox.h ? iBox.h : jBox.h;
+    double inter_h = ibox3d_h < jbox3d_h ? ibox3d_h : jbox3d_h;
     double inter_vol = inter_area * inter_h;
     double iou = inter_vol / (ivol + jvol - inter_vol);
     return iou;
 }
 
- 
  

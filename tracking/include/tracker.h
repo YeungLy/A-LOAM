@@ -18,7 +18,8 @@ class Tracker
   
     //association DetectedBoxs at current frame to existed Tracks
    //unmatched : assign the bool value to unmatch
-    Tracker();
+    Tracker(int loglevel = 0);
+    //Tracker();
     ~Tracker();
     
     std::vector< std::vector<double> > CreateDistanceMatrix(const std::vector<DetectedBox> & iBoxes, const std::vector<DetectedBox> & jBoxes);
@@ -29,6 +30,7 @@ class Tracker
     void UpdateGT(const std::vector<DetectedBox> & curr_boxes);
 
     std::map<int, DetectedBox> GetCurrentObjects();
+    std::vector<Track> GetAllTracks();
 
 
     void AddTrack(const DetectedBox & first_box, const int & start_frame);
@@ -40,6 +42,7 @@ class Tracker
     
     //member variable 
     std::vector<Track> tracks_;
+    std::vector<Track> dead_tracks_;
 
     /*
     maybe new Track.. 

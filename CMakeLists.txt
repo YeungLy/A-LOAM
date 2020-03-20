@@ -31,6 +31,7 @@ find_package(Boost REQUIRED COMPONENTS
 include_directories(
   include
     ${PROJECT_SOURCE_DIR}/tracking/include
+    ${PROJECT_SOURCE_DIR}/dataset
 	${catkin_INCLUDE_DIRS} 
 	${PCL_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}

@@ -4,6 +4,7 @@ install(TARGETS ${CPP_FILE} DESTINATION ../bin)
 
 include_directories(
     ./include
+    ../dataset
     )
 aux_source_directory(./src tracking_SRCS)
 

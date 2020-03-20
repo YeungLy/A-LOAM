@@ -1,8 +1,9 @@
 #include "track.h"
+#include <glog/logging.h>
 
 Track::Track(const DetectedBox & det, const int & start_frame, const int & id){
+    stage_ = "Init";
     start_frame_ = start_frame;
-    age_ = 1;
     id_ = id;
     history_.clear();
     history_.push_back(det);
@@ -53,7 +54,7 @@ void Track::predict()
     pred_box.h = kf_.state()(5);
     pred_box.yaw = kf_.state()(6);
     history_.push_back(pred_box);
-    matched_ = false;   //reset to false for next new frame
+    updated_ = false;   //reset to false for next new frame
     LOG(INFO) << "[Track::predict] id: " << id_ <<", velocity: vx=" << kf_.x_hat(7) <<", vy=" << kf_.x_hat(8) << ", vz=" << kf_.x_hat(9) <<"\npredict next frame box : " << pred_box.getPrintString() <<", from current frame box: " << curr_box.getPrintString();
     //LOG(INFO) << "[Track::predict] id: " << id_  << ", kf_.x_hat \n" << kf_.x_hat <<"\nkf_.x_hat\n" << kf_.x_hat;
     //LOG_IF(INFO, id_ == 1) << "[Track::predict] KF: predict next frame box: " << pred_box.getPrintString() <<", from current frame box: " << curr_box.getPrintString(); 
@@ -76,6 +77,7 @@ void Track::update(const DetectedBox & det)
     history_[now].yaw = kf_.state()(6);
     //LOG_IF(INFO, id_ == 1) << "[Track::update] after KF update: " << history_.back().getPrintString();
     //LOG(INFO) << "[Track::update] after KF update: " << history_.back().getPrintString();
+    updated_ = true;
 
 }
 
@@ -83,7 +85,7 @@ DetectedBox Track::getLatestBox() const
 {
     return history_.back();
 }
-bool Track::isStable() const 
+bool Track::isAlive(int current_frame) const
 {
-    return age_ > 2;
+    return current_frame >= start_frame_ && current_frame < end_frame_;
 }

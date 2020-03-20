@@ -40,8 +40,6 @@ std::mutex mBuf;
 jsk_recognition_msgs::BoundingBoxArrayPtr boxesCurr(new jsk_recognition_msgs::BoundingBoxArray());
 pcl::PointCloud<PointType>::Ptr laserCloudIn(new pcl::PointCloud<PointType>());
 
-Tracker tracker;
-
 
 //lidar pose
 Eigen::Quaterniond q_w_lidar(1, 0, 0, 0);
@@ -77,10 +75,6 @@ void BBoxArrayMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayConstPtr boxes_ms
         box.yaw = euler(2);
         //ROS_INFO_STREAM("box msg pose orientation(x,y,z,w) : " << q.coeffs() << "\n yaw: " << box.yaw);
         //
-        if (tracker.frame_idx_ < 3 && i == 0)
-        {
-            ROS_INFO_STREAM("first box's msg: quaternion (x,y,z,w) " << q.coeffs() << ", to yaw: " << box.yaw);
-        }
         box.l = boxes_msg->boxes[i].dimensions.x;
         box.w = boxes_msg->boxes[i].dimensions.y;
         box.h = boxes_msg->boxes[i].dimensions.z;
@@ -133,7 +127,9 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "tracklets");
     ros::NodeHandle nh;
 
+    bool verbose_tracker;
     nh.getParam("use_gt_objects", use_gt_objects);
+    nh.getParam("verbose_tracker", verbose_tracker);
     bool from_param;
     nh.param<bool>("use_gt_objects", from_param, false);
     string boxes_topic = "object_boxes";
@@ -145,6 +141,11 @@ int main(int argc, char **argv)
         ROS_INFO_STREAM("from_param is false");
 
 
+    int loglevel = 0;
+    if (!verbose_tracker)
+        loglevel = 1;
+
+    Tracker tracker(loglevel);
        
     ROS_INFO_STREAM("using boxes_topic: " << boxes_topic);
     //ros::Subscriber subObjectArray = nh.subscribe<jsk_recognition_msgs::BoundingBoxArray>("/object_boxes", 100, objectArrayHandler);
@@ -232,7 +233,7 @@ int main(int argc, char **argv)
                 bbox_msg.header.stamp = tracks_msg.header.stamp;
                 bbox_msg.header.frame_id = tracks_msg.header.frame_id;
                 tracks_msg.boxes.push_back(bbox_msg);
-                ROS_INFO_STREAM("[test_tracking]publish tracks_msg, boxes size: " << tracks_msg.boxes.size());
+                ROS_INFO_STREAM("[test_tracking]publish tracks_msg, id: " << id << ", at frame: " << tracker.frame_idx_);
 
                 //publish each object' odom and path, relative to global frame..
 

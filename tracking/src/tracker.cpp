@@ -1,14 +1,15 @@
 //trajectory and track manager
 #include "tracker.h"
-#include "iou.h"
+#include "kitti/iou.h"
+#include <iostream>
 #include <glog/logging.h>
 
-Tracker::Tracker()
+Tracker::Tracker(int loglevel)
 {
-
+    std::cout <<"log level: " << loglevel << std::endl;
     google::InitGoogleLogging("Tracker");
     google::SetStderrLogging(google::GLOG_INFO);
-    FLAGS_minloglevel = 2;
+    FLAGS_minloglevel = loglevel;
     FLAGS_log_dir = "/home/ncslab/Project/SLAM/LidarObjectSLAM/catkin_ws/src/LidarObjectSLAM/log";
     LOG(INFO) << "Start logging..";
     
@@ -23,7 +24,7 @@ void Tracker::AddTrack(const DetectedBox & first_box, const int & start_frame)
 {
     LOG(INFO) << "[AddTrack] create new Track at frame: " <<start_frame << ", id=tracks_count_ : " << tracks_count_;
     Track track(first_box, start_frame, tracks_count_);
-    track.matched_ = true;  //intialized state.
+    track.updated_ = true;  //intialized state.
     tracks_count_ += 1;
     tracks_.push_back(track);
 }
@@ -65,15 +66,16 @@ void Tracker::CleanUpTracks()
     //Add miss count to unmatched Tracks, delete those disappearing Tracks. 
     for (int i = 0; i < tracks_.size(); ++i)
     {
-        if (!tracks_[i].matched_)
+        if (!tracks_[i].updated_)
         {//maybe unmatched because of THRESHOLD or n_curr is smaller than n_pred.
             LOG(INFO) << "[CleanUpTracks]Track id: " << tracks_[i].id_ << " is unmatched.";
             tracks_[i].miss_count_++;
             if (tracks_[i].miss_count_ >= MAX_MISS_COUNT)
             {
+                tracks_[i].end_frame_ = frame_idx_;
                 LOG(INFO) << "[CleanUpTracks]Track id: " << tracks_[i].id_ << " equals to MAX_MISS_COUNT, delete it!";
+                dead_tracks_.push_back(tracks_[i]);
                 tracks_.erase(tracks_.begin() + i);
-                //DelTrack(tracks_[i].id_);
                 --i;
             }
         }
@@ -94,7 +96,7 @@ std::vector< std::vector<double> > Tracker::CreateDistanceMatrix(const std::vect
         std::vector<double> distRow;
         for (size_t j = 0; j < jBoxes.size(); ++j)
         {   
-            double iou = CalculateIoU3d(iBoxes[i], jBoxes[j]);
+            double iou = CalculateIoU3d(iBoxes[i].getEigenMatrix(), jBoxes[j].getEigenMatrix());
             double dist_iou, dist_center, dist_size;
             dist_iou = 1 - iou;
             dist_center = std::sqrt(
@@ -141,11 +143,13 @@ std::vector< std::vector<double> > Tracker::CreateDistanceMatrix(const std::vect
 
             distMat[i][j] = 0.6 * dist_iou + 0.3 * dist_center + 0.1 * dist_size;
 
+            /*
             LOG(INFO) << "[CreateDistanceMatrix]" 
                       << "\ni: " << i << ", box:" << iBoxes[i].getPrintString() 
                       << "\nj: " << j << ", box: " << jBoxes[j].getPrintString() 
                       << "\niou: " << 1 - dist_iou << ", dist_center: " << dist_center << ", dist_size: " << dist_size 
                       << ", dist: " << distMat[i][j];
+            */
         }
     }
 
@@ -178,7 +182,6 @@ void Tracker::UpdateGT(const std::vector<DetectedBox> & curr_boxes)
         {
             //LOG(INFO) << "[UpdateGT] updating Track: " << tracks_[index].id_ <<", box: " << tracks_[index].getLatestBox().getPrintString() << " using curr box: " << curr_boxes[i].getPrintString();
             tracks_[index].update(curr_boxes[i]);
-            tracks_[index].matched_ = true;
         }
     }
     CleanUpTracks();
@@ -190,9 +193,9 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
 
     //predict each Track's state at current frame unless tracks_.size == 0
     //
-    if (tracks_.size() == 0)
+    if (tracks_.size()== 0)
     {
-        LOG(INFO) << "[Update] No Track, still initializing";
+        LOG(INFO) << "[Update] No track, still initializing";
         if (curr_boxes.size() == 0)
             LOG(INFO) << "[Update] No box detected at current frame ";
         else
@@ -200,11 +203,12 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
         frame_idx_++;
         return;
     }
+    std::vector<DetectedBox> pred_boxes;
     for (int i = 0; i < tracks_.size(); ++i)
     {
         tracks_[i].predict();
+        pred_boxes.push_back(tracks_[i].getLatestBox());
     }
-
     if (curr_boxes.size() == 0)
     {
         LOG(INFO) << "[Update] No box detected at current frame ";
@@ -214,11 +218,6 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
         //tracks_.size() != 0 && curr_boxes.size() != 0, match them and update Tracks!
 
         LOG(INFO) << "[Update] Updating " << tracks_.size() << " Track(s) state by " << curr_boxes.size() <<" current_boxes";
-        std::vector<DetectedBox> pred_boxes;
-        for (size_t i = 0; i < tracks_.size(); ++i)
-        {
-            pred_boxes.push_back(tracks_[i].getLatestBox());
-        }
         //calculate distance matrix
         LOG(INFO) << "Calculating distance between curr(i) and pred(j):";
         std::vector< std::vector<double> > dist = CreateDistanceMatrix(curr_boxes, pred_boxes);
@@ -242,8 +241,9 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
                 continue;
             }
             //LOG(INFO) << "[Update] matching result: i_curr " << i_curr <<" to i_pred " << i_pred << ", dist: " << dist[i_curr][i_pred]; 
-            if (!tracks_[i_pred].isStable())
-                dist_threshold = MAX_DIST_NEWBORN;
+            //if (!tracks_[i_pred].isStable())
+            //    dist_threshold = MAX_DIST_NEWBORN;
+            LOG(INFO) << "[Update]dist threshold: " << dist_threshold;
             if (dist[i_curr][i_pred] >= dist_threshold)
             {
                 //unmatched.
@@ -257,7 +257,6 @@ void Tracker::Update(const std::vector<DetectedBox> & curr_boxes)
                 LOG(INFO) << "[Update]match succeeded for curr_box id: " << i_curr << " and Track id: " << tracks_[i_pred].id_ <<", distance: " << dist[i_curr][i_pred];
                 tracks_[i_pred].update(curr_boxes[i_curr]);
                 tracks_[i_pred].miss_count_ = 0;
-                tracks_[i_pred].matched_ = true;
             }
         }
 
@@ -373,10 +372,17 @@ std::map<int, DetectedBox> Tracker::GetCurrentObjects()
     {
         DetectedBox curr_box = tracks_[i].getLatestBox();
         int id = tracks_[i].id_;
-        LOG_IF(INFO, id==5) << "id: " << id << ", curr box: " << curr_box.getPrintString() << ", at frame: " << frame_idx_;
+        LOG(INFO) << "[GetCurrentObjects]id: " << id << ", curr box: " << curr_box.getPrintString() << ", at frame: " << frame_idx_;
         boxes[id] = curr_box;
     }
     return boxes;
 }
+std::vector<Track> Tracker::GetAllTracks()
+{
+    std::vector<Track> all(dead_tracks_);
+    all.insert(all.end(), tracks_.begin(), tracks_.end());
+    return all;
+}
+
 
 

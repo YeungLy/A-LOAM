@@ -89,7 +89,7 @@ void projectBoxtoImage(const Eigen::Matrix<double, 3, 8> & box3d_corners, const 
     Eigen::Array<double, 2, 8> arr = box3d_corners_projected.array().topRows(2);
     arr.rowwise() /= box3d_corners_projected.array().row(2);
     projected_box3d = arr.matrix();
-    std::cout << "[projectBoxtoImage] box3d_corners: \n" << box3d_corners << ", projectd 2d: \n" << projected_box3d << std::endl;
+    //std::cout << "[projectBoxtoImage] box3d_corners: \n" << box3d_corners << ", projectd 2d: \n" << projected_box3d << std::endl;
 }
 
 #endif
