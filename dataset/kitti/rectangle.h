@@ -1,7 +1,6 @@
-#ifndef KITTI_IOU_H
-#define KITTI_IOU_H
+#ifndef RECTANGLE_H
+#define RECTANGLE_H
 
-//#include "tracker.h"
 
 #include <cmath>
 #include <iostream>
@@ -14,14 +13,14 @@
 //maybe matrix cooperation can use eigen
 
 
-class Rectangle2D {
+class Rectangle {
 
     public:
-    Rectangle2D(Eigen::MatrixXd crns); 
+    Rectangle(Eigen::MatrixXd crns); 
     bool isInsidePoint(const Eigen::Vector2d & p);
     bool isEndPoint(const Eigen::Vector2d & p);
     double getArea(); 
-    double getIntersectArea(Rectangle2D & rec);
+    double getIntersectArea(Rectangle & rec);
     
     Eigen::MatrixXd corners;
     Eigen::MatrixXd edges;

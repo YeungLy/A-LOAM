@@ -96,7 +96,8 @@ std::vector< std::vector<double> > Tracker::CreateDistanceMatrix(const std::vect
         std::vector<double> distRow;
         for (size_t j = 0; j < jBoxes.size(); ++j)
         {   
-            double iou = CalculateIoU3d(iBoxes[i].getEigenMatrix(), jBoxes[j].getEigenMatrix());
+            //double iou = CalculateIoU3d(iBoxes[i].getEigenMatrix(), jBoxes[j].getEigenMatrix());
+            double iou = iBoxes[i].iou(jBoxes[j]);
             double dist_iou, dist_center, dist_size;
             dist_iou = 1 - iou;
             dist_center = std::sqrt(

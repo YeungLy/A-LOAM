@@ -167,6 +167,31 @@ Eigen::MatrixXd loadCalibrationCamera(std::string calib_name)
 
 }
 
+Eigen::Vector3d Point3DfromVelotoCam2(const std::string & calib_path, const Eigen::Vector3d & p_velo)
+{
+    //normally cam2
+    Eigen::Vector3d p_cam;
+    
+    Eigen::Matrix<double, 4, 4> Tr_cam0_velo = loadCalibrationRigid(calib_path);
 
+    Eigen::Matrix<double, 4, 4> R_rect_00 = loadCalibrationCamera("R_rect_00");
+    Eigen::Matrix<double, 4, 4> T_cam0_velo = R_rect_00 * Tr_cam0_velo;
+    Eigen::Vector4d p_velo_homo;
+    p_velo_homo << p_velo, 1.0;
+    Eigen::Vector4d p_cam_homo = T_cam0_velo * p_velo;
+}
+Eigen::Vector2d projectfromVelotoCam2(const std::string & calib_path, const Eigen::Vector3d & p_velo)
+{
+    //normally cam2
+    Eigen::Vector3d p_cam;
+    
+    Eigen::Matrix<double, 4, 4> Tr_cam0_velo = loadCalibrationRigid(calib_path);
+
+    Eigen::Matrix<double, 4, 4> R_rect_00 = loadCalibrationCamera("R_rect_00");
+    Eigen::Matrix<double, 4, 4> T_cam0_velo = R_rect_00 * Tr_cam0_velo;
+    Eigen::Vector4d p_velo_homo;
+    p_velo_homo << p_velo, 1.0;
+    Eigen::Vector4d p_cam_homo = T_cam0_velo * p_velo;
+}
 #endif
 

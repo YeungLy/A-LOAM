@@ -1,8 +1,5 @@
 
-#include "iou.h"
-#include "Eigen/src/Geometry/AngleAxis.h"
-
-
+#include "rectangle.h"
 #include <cmath>
 #include <vector>
 #include <map>
@@ -38,7 +35,7 @@ void getMinMaxofTwoCorners(const Eigen::Vector2d & a, const Eigen::Vector2d & b,
     ymin = a.y() < b.y() ? a.y() : b.y();
 }
 
-Rectangle2D::Rectangle2D(Eigen::MatrixXd crns) 
+Rectangle::Rectangle(Eigen::MatrixXd crns) 
 { 
     corners = crns; 
     Eigen::MatrixXd ecorners(2, 4);
@@ -47,7 +44,7 @@ Rectangle2D::Rectangle2D(Eigen::MatrixXd crns)
     ecorners.rightCols(1) = corners.leftCols(1);
     edges = ecorners - corners;        
 }
-bool Rectangle2D::isInsidePoint(const Eigen::Vector2d & p) 
+bool Rectangle::isInsidePoint(const Eigen::Vector2d & p) 
 {
     Eigen::Vector2d AP, BP, CP, DP;
     AP = p - corners.col(0);
@@ -58,17 +55,17 @@ bool Rectangle2D::isInsidePoint(const Eigen::Vector2d & p)
     return (eigen_vector2d_cross(edges.col(0), AP) * eigen_vector2d_cross(edges.col(2), CP) > 0) 
             && (eigen_vector2d_cross(edges.col(1), BP) * eigen_vector2d_cross(edges.col(3), DP) > 0);
 }
-bool Rectangle2D::isEndPoint(const Eigen::Vector2d & p)
+bool Rectangle::isEndPoint(const Eigen::Vector2d & p)
 {
     return corners.col(0) == p || corners.col(1) == p || corners.col(2) == p || corners.col(3) == p;
 }
-double Rectangle2D::getArea() 
+double Rectangle::getArea() 
 {
     return std::abs(eigen_vector2d_cross(edges.col(0), edges.col(1)));
 }
 
 
-double Rectangle2D::getIntersectArea(Rectangle2D & rec)
+double Rectangle::getIntersectArea(Rectangle & rec)
 {
     std::vector<Eigen::Vector2d> vertexes;
     std::map<Eigen::Vector2d, char, MyCompareEigenVector2d> vertexes_exist;
@@ -192,9 +189,9 @@ double BoxIoUBev(const Eigen::Matrix<double, 7, 1> & ibox3d, const Eigen::Matrix
     //icorners: 2*4, jcorners: 2*4, four 2D box corner points in clockwise.
     double iou;
     Eigen::MatrixXd corners3d = convertBox3Dto8corners(ibox3d, coordinate);
-    Rectangle2D irec(corners3d.topLeftCorner(2, 4));
+    Rectangle irec(corners3d.topLeftCorner(2, 4));
     corners3d = convertBox3Dto8corners(jbox3d, coordinate);
-    Rectangle2D jrec(corners3d.topLeftCorner(2, 4));
+    Rectangle jrec(corners3d.topLeftCorner(2, 4));
     std::cout << "corners of irec: \n" << irec.corners << std::endl; 
     std::cout << "corners of jrec: \n" << jrec.corners << std::endl; 
         
@@ -215,10 +212,10 @@ double CalculateIoU3d(const Eigen::Matrix<double, 7, 1> & ibox3d, const Eigen::M
     double ibox3d_h = ibox3d(5);
     double jbox3d_h = jbox3d(5);
     Eigen::MatrixXd ibox3d_corners = convertBox3Dto8corners(ibox3d, coordinate);
-    Rectangle2D irec(ibox3d_corners.topLeftCorner(2, 4));
+    Rectangle irec(ibox3d_corners.topLeftCorner(2, 4));
     double ivol = irec.getArea() * ibox3d_h;
     Eigen::MatrixXd jbox3d_corners = Box3dToCorners(jbox3d, coordinate);
-    Rectangle2D jrec(jbox3d_corners.topLeftCorner(2, 4));
+    Rectangle jrec(jbox3d_corners.topLeftCorner(2, 4));
     double jvol = jrec.getArea() * jbox3d_h;
     double inter_area = irec.getIntersectArea(jrec);
     double inter_h = ibox3d_h < jbox3d_h ? ibox3d_h : jbox3d_h;

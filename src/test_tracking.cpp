@@ -23,7 +23,10 @@
 
 #include "tracker.h"
 #include "kitti/utils.h"
-#include "kitti/box_utils.h"
+#include "kitti/box.h"
+
+//default is velodyne coordinate.
+typedef kitti::Box3D DetectedBox;
 
 using std::atan2;
 using std::cos;
