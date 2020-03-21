@@ -10,14 +10,14 @@ namespace kitti {
         public:
         
         Box3D(): x(0.0), y(0.0), z(0.0), l(0.0), w(0.0), h(0.0), yaw(0.0), coordinate("velodyne") {}
-        Box3D(double x, double y, double z, double l, double w, double h, double yaw, std::string coord): x(x), y(y), z(z), l(l), w(w), h(h), yaw(yaw), coordinate(Coord) {}
+        Box3D(double x, double y, double z, double l, double w, double h, double yaw, std::string coord="velodyne"): x(x), y(y), z(z), l(l), w(w), h(h), yaw(yaw), coordinate(coord) {}
 
-        Eigen::Matrix<double, 3, 8> center_to_corners();
-        Eigen::Matrix<double, 2, 4> bev_corners();
+        Eigen::Matrix<double, 3, 8> center_to_corners() const;
+        Eigen::Matrix<double, 2, 4> bev_corners() const;
         
         //project to camera
-        Eigen::Matrix<double, 2, 8> project_to_image(const Eigen::Matrix<double, 3, 4> & P);
-        Box2D get_box2d(const Eigen::Matrix<double, 3, 4> & P);
+        //Eigen::Matrix<double, 2, 8> project_to_image(const Eigen::Matrix<double, 3, 4> & P);
+        //Box2D get_box2d(const Eigen::Matrix<double, 3, 4> & P);
         
         double volumn() const 
         {
@@ -34,7 +34,7 @@ namespace kitti {
                + ", yaw: " + std::to_string(yaw); 
         }
         //IoU
-        double iou(const Box3D & j);
+        double iou(const Box3D & j) const;
         //data
         double x, y, z, l, w, h, yaw;
         double id;
@@ -48,10 +48,10 @@ namespace kitti {
     class Box2D {
         public:
         Box2D(): xmin(0.0), ymin(0.0), xmax(0.0), ymax(0.0) {}
-        Box2d(double xmin, double ymin, double xmax, double ymax): xmin(xmin), ymin(ymin), xmax(xmax), ymax(ymax) {}
+        Box2D(double xmin, double ymin, double xmax, double ymax): xmin(xmin), ymin(ymin), xmax(xmax), ymax(ymax) {}
         
         //IoU
-        double iou(const Box2D & b);
+        double iou(const Box2D & b) const;
         double area() const {
             return (xmax - xmin) * (ymax - ymin);
         }

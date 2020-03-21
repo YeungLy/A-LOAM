@@ -35,7 +35,7 @@ class Line
     }
     double a, b, c;
 };
-
+/*
 void test_line()
 {
     Eigen::Vector2d v1(0.0, 1.0);
@@ -53,10 +53,10 @@ void test_line()
 
 
 }
-
+*/
 double intersect_area(Eigen::Matrix<double, 2, 4> rec1, Eigen::Matrix<double, 2, 4> rec2)
 {
-    test_line();
+    //test_line();
 
     std::vector<Eigen::Vector2d> vertexes;
     //initiliaze vertexes with all rec1 corners

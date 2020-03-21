@@ -40,31 +40,6 @@ Eigen::Matrix<double, 3, 8> Box3D::center_to_corners() const
     corners.colwise() += t;
     return corners;
 }
-/*
-Eigen::Matrix<double, 2, 8> Box3D::project_to_image(const Eigen::Matrix<double, 3, 4> & P)
-{        
-    assert(coordinate == "camera")
-    //P: projection matrix 
-    //homogenous coordinate
-    Eigen::Matrix<double, 4, 8> box3d_corners_homo = Eigen::MatrixXd::Ones(4, 8);
-    box3d_corners_homo.topLeftCorner(3, 8) = this->center_to_corners();
-    Eigen::Matrix<double, 3, 8> box3d_corners_projected_homo = P * box3d_corners_homo;
-    Eigen::Array<double, 2, 8> arr = box3d_corners_projected_homo.array().topRows(2);
-    arr.rowwise() /= box3d_corners_projected_homo.array().row(2);
-    return arr.matrix();
-    //std::cout << "[projectBoxtoImage] box3d_corners: \n" << box3d_corners << ", projectd 2d: \n" << projected_box3d << std::endl;
-}
-
-Box2D Box3D::get_box2d(const Eigen::Matrix<double, 3, 4> & P)
-{        
-    Eigen::Matrix<double, 2, 8> box3d_corners_projected = this->project_to_image(P);
-    double xmin = box3d_corners_projected.row(0).minCoeff();
-    double ymin = box3d_corners_projected.row(1).minCoeff();
-    double xmax = box3d_corners_projected.row(0).maxCoeff();
-    double ymax = box3d_corners_projected.row(1).maxCoeff();
-    return Box2D(xmin, ymin, xmax, ymax);
-}
-*/
 Eigen::Matrix<double, 2, 4> Box3D::bev_corners() const
 {
     Eigen::Matrix<double, 3, 8> corners3d = this->center_to_corners();
@@ -88,11 +63,11 @@ double Box3D::iou(const Box3D & j) const
     //intersection
     double inter_h = h < j.h ? h :j.h;
     //bev intersect area
-    std::cout << "irec: " << this->bev_corners() << std::endl; 
-    std::cout << "jrec: " << j.bev_corners() << std::endl; 
+    //std::cout << "irec: " << this->bev_corners() << std::endl; 
+    //std::cout << "jrec: " << j.bev_corners() << std::endl; 
     //[TODO]: iou may be still wrong.. how to sort an 
     double inter_area = intersect_area(this->bev_corners(), j.bev_corners());
-    std::cout << "inter: "<< inter_area << std::endl;
+    //std::cout << "inter: "<< inter_area << std::endl;
     double intersect = inter_h * inter_area;
     //union
     double sum = this->volumn() + j.volumn();
