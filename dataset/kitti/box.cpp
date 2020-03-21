@@ -1,10 +1,10 @@
 #include "box.h"
 #include "box_utils.h"
-#include "rectangle.h"
+#include "polygon_intersect.h"
 
 using namespace kitti;
 
-Eigen::Matrix<double, 3, 8> Box3D::center_to_corners()
+Eigen::Matrix<double, 3, 8> Box3D::center_to_corners() const
 {
     //box3d: (x,y,z,l,w,h,yaw)
     //8corners: (x,y,z), 3*8
@@ -17,7 +17,7 @@ Eigen::Matrix<double, 3, 8> Box3D::center_to_corners()
         corners << l / 2., -l / 2., -l / 2., l / 2., l / 2., -l / 2., -l / 2., l / 2.,
                     -w / 2., -w / 2., w /2., w / 2., -w / 2., -w / 2., w /2., w / 2.,
                     0, 0, 0, 0, h, h, h, h;
-        euler << 0.0, 0.0, box3d(6);
+        euler << 0.0, 0.0, yaw;
     }
     else if (coordinate == "camera")
     {
@@ -26,7 +26,7 @@ Eigen::Matrix<double, 3, 8> Box3D::center_to_corners()
                     0, 0, 0, 0, -h, -h, -h, -h,
                     w / 2., -w / 2., -w /2., w / 2., w / 2., -w / 2., -w /2., w / 2.;
          
-        euler << 0.0, box3d(6), 0.0;
+        euler << 0.0, yaw, 0.0;
     }
     else
     {
@@ -35,11 +35,12 @@ Eigen::Matrix<double, 3, 8> Box3D::center_to_corners()
     }
 
     Eigen::Quaterniond q = euler_to_quaternion(euler);
-    Eigen::Vector3d t(box3d(0), box3d(1), box3d(2));
+    Eigen::Vector3d t(x, y, z);
     corners = q.toRotationMatrix() * corners;
     corners.colwise() += t;
     return corners;
 }
+/*
 Eigen::Matrix<double, 2, 8> Box3D::project_to_image(const Eigen::Matrix<double, 3, 4> & P)
 {        
     assert(coordinate == "camera")
@@ -63,7 +64,8 @@ Box2D Box3D::get_box2d(const Eigen::Matrix<double, 3, 4> & P)
     double ymax = box3d_corners_projected.row(1).maxCoeff();
     return Box2D(xmin, ymin, xmax, ymax);
 }
-Eigen::Matrix<double, 2, 4> Box3D::bev_corners()
+*/
+Eigen::Matrix<double, 2, 4> Box3D::bev_corners() const
 {
     Eigen::Matrix<double, 3, 8> corners3d = this->center_to_corners();
     Eigen::Matrix<double, 2, 4> corners_bev;
@@ -71,42 +73,41 @@ Eigen::Matrix<double, 2, 4> Box3D::bev_corners()
     if (coordinate == "velodyne")
     {
         //x, y
-        corners_bev = corner3d.topLeftCorners(2, 4);
+        corners_bev = corners3d.topLeftCorner(2, 4);
     }
     else if (coordinate == "camera")
     {
         //x, z
-        corners_bev.row(0) = corners3d.topLeftCorners(1, 4);
-        corners_bev.row(1) = corners3d.bottomLeftCorners(1, 4);
+        corners_bev.row(0) = corners3d.topLeftCorner(1, 4);
+        corners_bev.row(1) = corners3d.bottomLeftCorner(1, 4);
     }
     return corners_bev;
 }
-double Box3D::iou(const Box3D & j)
+double Box3D::iou(const Box3D & j) const
 {
     //intersection
     double inter_h = h < j.h ? h :j.h;
     //bev intersect area
-    Rectangle irec(this->bev_corners());
-    Rectangle jrec(j->bev_corners());
-    double inter_area = irec.getIntersectArea(jrec);
+    std::cout << "irec: " << this->bev_corners() << std::endl; 
+    std::cout << "jrec: " << j.bev_corners() << std::endl; 
+    //[TODO]: iou may be still wrong.. how to sort an 
+    double inter_area = intersect_area(this->bev_corners(), j.bev_corners());
+    std::cout << "inter: "<< inter_area << std::endl;
     double intersect = inter_h * inter_area;
     //union
     double sum = this->volumn() + j.volumn();
     assert(sum > intersect);
+    
     double iou = intersect / (sum - intersect);
-    assert(iou <= 1);
+    if (!(iou <= 1 && iou >= 0))
+    {
+        std::cout << "ibox: " << this->getPrintString() << ", jbox: " << j.getPrintString() << ", iou: " << iou << std::endl;
+    }
+    assert(iou <= 1 && iou >= 0);
     return iou;
 }
 
-Box3D Box3D::convertCoordinate(std::string target_coordinate)
-{
-    if (target_coordinate == this->coordinate)
-        return *this;
-    Box3D box;
-    
-}
-
-double Box2D::iou(const Box2D & j)
+double Box2D::iou(const Box2D & j) const
 {
     double left = this->xmin > j.xmin ? this->xmin : j.xmin;
     double top = this->ymin > j.ymin ? this->ymin : j.ymin;
@@ -115,9 +116,11 @@ double Box2D::iou(const Box2D & j)
     if (left < right && top < bottom)
     {
         double inter = (right - left) * (bottom - top);
-        double sum = i.area() + j.area();
+        double sum = this->area() + j.area();
         assert(sum - inter > 0);
-        return inter / (sum - inter);
+        double iou = inter / (sum - inter);
+        assert(iou <= 1 && iou >= 0);
+        return iou;
     }
 }
 
