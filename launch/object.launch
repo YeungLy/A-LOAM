@@ -22,7 +22,7 @@
      <node pkg="obj_aloam" type="aSegment" name="aSegment" output="screen"> 
      </node>
 
-     <node pkg="obj_aloam" type="aTracklets" name="aTracklets" output="screen">
+     <node pkg="obj_aloam" type="aTracklet" name="aTracklet" output="screen">
      </node>
 
      <node pkg="obj_aloam" type="ascanRegistration" name="ascanRegistration" output="log" >

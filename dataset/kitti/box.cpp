@@ -14,8 +14,8 @@ Eigen::Matrix<double, 3, 8> Box3D::center_to_corners() const
     if (coordinate == "velodyne")
     {
         // x: forward, y: right, z: up, rz is zero when object facing toward (just as x-positive).
-        corners << l / 2., -l / 2., -l / 2., l / 2., l / 2., -l / 2., -l / 2., l / 2.,
-                    -w / 2., -w / 2., w /2., w / 2., -w / 2., -w / 2., w /2., w / 2.,
+        corners << l / 2., l / 2., -l / 2., -l / 2., l / 2., l / 2., -l / 2., -l / 2.,
+                    w / 2., -w / 2., -w /2., w / 2., w / 2., -w / 2., -w /2., w / 2.,
                     0, 0, 0, 0, h, h, h, h;
         euler << 0.0, 0.0, yaw;
     }
@@ -39,6 +39,40 @@ Eigen::Matrix<double, 3, 8> Box3D::center_to_corners() const
     corners = q.toRotationMatrix() * corners;
     corners.colwise() += t;
     return corners;
+}
+
+Eigen::Matrix<double, 3, 2> Box3D::orientation_vector() const
+{
+    //box3d: (x,y,z,l,w,h,yaw)
+    //8corners: (x,y,z), 3*8
+    //Eigen::MatrixXd corners(3, 8);
+    Eigen::Matrix<double, 3, 2> orientation;
+    orientation <<  0, 0.7 * l,
+                    0, 0,
+                    0, 0;
+    Eigen::Vector3d euler;
+    if (coordinate == "velodyne")
+    {
+        // x: forward, y: right, z: up, rz is zero when object facing toward (just as x-positive).
+        euler << 0.0, 0.0, yaw;
+    }
+    else if (coordinate == "camera")
+    {
+        // x: left, y: down, z: forward, ry is zero when object facing left(just as x-positive)
+        euler << 0.0, yaw, 0.0;
+    }
+    else
+    {
+        std::cerr << "Invalid coordinate string : " << coordinate << ", should be 'velodyne' or 'camera' " << std::endl;
+        return orientation;
+    }
+
+    Eigen::Quaterniond q = euler_to_quaternion(euler);
+    Eigen::Vector3d t(x, y, z);
+    std::cout << "orinetaion before rot: " << orientation << "\nrot mat:\n" << q.toRotationMatrix() << std::endl;
+    orientation = q.toRotationMatrix() * orientation;
+    orientation.colwise() += t;
+    return orientation;
 }
 Eigen::Matrix<double, 2, 4> Box3D::bev_corners() const
 {

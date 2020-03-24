@@ -39,6 +39,7 @@ include_directories(
   ${Boost_INCLUDE_DIRS})
 
 add_subdirectory(tracking)
+add_subdirectory(dataset/kitti)
 
 catkin_package(
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs jsk_recognition_msgs
@@ -51,10 +52,10 @@ add_executable(aSegment src/segmentCloud.cpp)
 target_link_libraries(aSegment ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(aTracklet src/object.cpp)
-target_link_libraries(aTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES} tracking glog)
+target_link_libraries(aTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES} tracking glog kitti)
 
 add_executable(aTestTracklet src/test_tracking.cpp)
-target_link_libraries(aTestTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} tracking glog)
+target_link_libraries(aTestTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} tracking glog kitti)
 
 add_executable(ascanRegistration src/scanRegistration.cpp)
 target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})
@@ -69,10 +70,10 @@ target_link_libraries(alaserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES
 #target_link_libraries(kittiHelper ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 add_executable(kittiHelperRaw src/kittiHelperRaw.cpp)
-target_link_libraries(kittiHelperRaw ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(kittiHelperRaw ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} kitti)
 
 add_executable(kittiConverter src/kittiConverter.cpp)
-target_link_libraries(kittiConverter ${catkin_LIBRARIES})
+target_link_libraries(kittiConverter ${catkin_LIBRARIES} kitti)
 #add_executable(pubTracklet src/pubTracklet.cpp)
 #target_link_libraries(pubTracklet ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${Boost_LIBRARIES})
 

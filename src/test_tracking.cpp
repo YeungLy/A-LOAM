@@ -24,6 +24,7 @@
 #include "tracker.h"
 #include "kitti/utils.h"
 #include "kitti/box.h"
+#include "kitti/box_utils.h"
 
 //default is velodyne coordinate.
 typedef kitti::Box3D DetectedBox;
@@ -224,7 +225,7 @@ int main(int argc, char **argv)
             {
                 int id = it->first;
                 DetectedBox box = it->second;
-                if (id < 0 || box.isValid() == false)
+                if (id < 0 || !(box.l > 0 && box.w > 0 && box.h > 0) )
                 {
                     ROS_ERROR_STREAM("[publish] There are invalid id or box at current tracker!");
                     continue;

@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "kitti_helper_raw");
     ros::NodeHandle n("~");
-    std::string dataset_folder, output_bag_file, calib_folder, detections_subfolder;
+    std::string dataset_folder, output_bag_file, calib_folder, detections_subfolder, bag_timestamps_file;
     int num_frame = 5;
     bool pub_tracks_gt, pub_detections;
     n.getParam("num_frame", num_frame);
@@ -49,6 +49,7 @@ int main(int argc, char** argv)
     n.getParam("to_bag", to_bag);
     if (to_bag)
         n.getParam("output_bag_file", output_bag_file);
+        n.getParam("bag_timestamps_file", bag_timestamps_file);
     int publish_delay;
     n.getParam("publish_delay", publish_delay);
     publish_delay = publish_delay <= 0 ? 1 : publish_delay;
@@ -108,6 +109,7 @@ int main(int argc, char** argv)
     rosbag::Bag bag_out;
     if (to_bag)
         bag_out.open(output_bag_file, rosbag::bagmode::Write);
+        std::ofstream bag_timestamps_frameid(bag_timestamps_file, std::ofstream::out);
     
     Eigen::Matrix3d R_transform;
     R_transform << 0, 0, 1, -1, 0, 0, 0, -1, 0;
@@ -120,6 +122,7 @@ int main(int argc, char** argv)
     
     std::string line;
     std::size_t line_num = 0;
+
 
     ros::Rate r(10.0 / publish_delay);
     
@@ -212,10 +215,10 @@ int main(int argc, char** argv)
 
             std::stringstream label_path;
             label_path << dataset_folder << detections_subfolder << std::setfill('0') << std::setw(10) << line_num << ".txt";
-            //ROS_INFO_STREAM("loading detection results from : " << label_path.str() << " at frame: " << line_num);
             std::vector<std::vector<double> > objects;
             //camera2 to velo coordinate
             loadObjectLabelToVelo(label_path.str(), T_cam2_velo, objects);
+            ROS_INFO_STREAM("loading " <<objects.size() << " detection results from : " << label_path.str() << " at frame: " << line_num);
             for (size_t idx = 0; idx < objects.size(); idx++)
             {
                 Eigen::Vector3d euler(0.0, 0.0, objects[idx][6]); //(rx, ry, rz)
@@ -234,12 +237,14 @@ int main(int argc, char** argv)
                 bbox.dimensions.x = objects[idx][3];
                 bbox.dimensions.y = objects[idx][4];
                 bbox.dimensions.z = objects[idx][5];
+                bbox.value = objects[idx][7];
                 detections.boxes.push_back(bbox);
             }
             //ROS_INFO_STREAM("publishing detections size: " << objects.size() << " at frame: " << line_num);
             pubDetections.publish(detections);
         }
 
+        bag_timestamps_frameid << line_num << " " << timestamp << "\n";
         // read tracklets
         jsk_recognition_msgs::BoundingBoxArray tracksGT;
         if (pub_tracks_gt)
@@ -283,6 +288,7 @@ int main(int argc, char** argv)
                 //preserving 'bbox.label' empty for matching result by current frame and last frame.
                 //bbox.value=id;  
                 bbox.label = id;
+                bbox.value = 1.0;
                 tracksGT.boxes.push_back(bbox);
             }
             pubTracksGT.publish(tracksGT);
@@ -342,6 +348,7 @@ int main(int argc, char** argv)
     }
     if (to_bag)
         bag_out.close();
+        bag_timestamps_frameid.close();
     std::cout << "Done \n";
 
 

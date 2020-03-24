@@ -100,19 +100,23 @@ double convertStrDatetimetoTimestamp(const std::string & s)
 void loadObjectLabelToVelo(const std::string label_path, const Eigen::Matrix<double, 4, 4> & T_cam2_velo, std::vector<std::vector<double> > &objs)
 {
     
-    //objs: (x, y, z, l, w, h, yaw), yaw at obj format is start from left(from camera-x positive axis), rz at tracklet format is start from head(from velo-x positive axis),  positive=clock counterwise
+    //objs: (x, y, z, l, w, h, yaw, score), yaw at obj format is start from left(from camera-x positive axis), rz at tracklet format is start from head(from velo-x positive axis),  positive=clock counterwise
     
     std::ifstream label_file(label_path, std::ifstream::in);
     std::string line;
+    double score_threshold = 0.7;
     while (std::getline(label_file, line)) 
     {
+        //std::cout << "read line from object label: " << line;
         std::stringstream ss(line);
         double element;
         std::vector<double> obj;
-        while (ss >> element && obj.size() < 7)
+        while (ss >> element && obj.size() < 8)
             obj.push_back(element);
-        if (obj.size() != 7)
+        if (obj.size() < 7)
             std::cerr << "Loading label from " << label_path <<" wrong, there should be at least 7 numbers each line (x,y,z,h,w,l,ry).";
+        if (obj.size() == 8 && obj[7] < score_threshold)
+            continue;
         //transform to velo coordinate
         Eigen::Vector4d pos_at_cam;
         pos_at_cam << obj[0], obj[1], obj[2], 1.0;
@@ -122,6 +126,7 @@ void loadObjectLabelToVelo(const std::string label_path, const Eigen::Matrix<dou
         obj[0] = pos_at_velo(0);
         obj[1] = pos_at_velo(1);
         obj[2] = pos_at_velo(2);
+      
         obj[6] += M_PI/2;       //add pi/2.
         objs.push_back(obj);
 
@@ -166,7 +171,7 @@ Eigen::MatrixXd loadCalibrationCamera(std::string calib_name)
     return calib;
 
 }
-
+/*
 Eigen::Vector3d Point3DfromVelotoCam2(const std::string & calib_path, const Eigen::Vector3d & p_velo)
 {
     //normally cam2
@@ -193,5 +198,6 @@ Eigen::Vector2d projectfromVelotoCam2(const std::string & calib_path, const Eige
     p_velo_homo << p_velo, 1.0;
     Eigen::Vector4d p_cam_homo = T_cam0_velo * p_velo;
 }
+*/
 #endif
 

@@ -5,7 +5,7 @@
 #include "KalmanFilter.h"
 #include "kitti/box.h"
 
-typede kitti::Box3D DetectedBox;
+typedef kitti::Box3D DetectedBox;
         
 
 class Track

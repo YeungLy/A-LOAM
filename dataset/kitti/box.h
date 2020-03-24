@@ -13,6 +13,7 @@ namespace kitti {
         Box3D(double x, double y, double z, double l, double w, double h, double yaw, std::string coord="velodyne"): x(x), y(y), z(z), l(l), w(w), h(h), yaw(yaw), coordinate(coord) {}
 
         Eigen::Matrix<double, 3, 8> center_to_corners() const;
+        Eigen::Matrix<double, 3, 2> orientation_vector() const;
         Eigen::Matrix<double, 2, 4> bev_corners() const;
         
         //project to camera
