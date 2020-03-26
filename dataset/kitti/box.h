@@ -36,6 +36,7 @@ namespace kitti {
         }
         //IoU
         double iou(const Box3D & j) const;
+        double iou2d(const Box3D & j) const;
         //data
         double x, y, z, l, w, h, yaw;
         double id;

@@ -37,6 +37,7 @@ Eigen::Vector3d quaternion_to_euler(Eigen::Quaterniond q)
 
 Box2D projectToImage(const Eigen::Matrix<double, 3, 8> box3d_corners, const Eigen::Matrix<double, 3, 3>& K)
 {
+    //to image2.
     //Eigen::Matrix<double, 3, 8> box3d_corners = box3d.center_to_corners();
     Eigen::Matrix<double, 3, 8> box3d_corners_projected_homo = K * box3d_corners;
     Eigen::Array<double, 2, 8> tmp = box3d_corners_projected_homo.array().topRows(2);
@@ -50,6 +51,7 @@ Box2D projectToImage(const Eigen::Matrix<double, 3, 8> box3d_corners, const Eige
 }
 bool transformVeloToCam3D(const Box3D box_velo, const Eigen::Matrix<double, 4, 4> T_cam0_velo, Eigen::Matrix<double, 3, 8> & corners_cam)
 {
+    //from velo to cam0
     bool visible_at_cam; 
     Eigen::Matrix<double, 3, 8> corners_velo = box_velo.center_to_corners();
     //box3d corners from velo to cam

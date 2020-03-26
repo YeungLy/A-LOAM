@@ -1,5 +1,6 @@
 #include "box.h"
 #include "box_utils.h"
+#include "utils.h"
 #include "polygon_intersect.h"
 
 using namespace kitti;
@@ -114,6 +115,30 @@ double Box3D::iou(const Box3D & j) const
     }
     assert(iou <= 1 && iou >= 0);
     return iou;
+}
+double Box3D::iou2d(const Box3D & j) const
+{//default is project to cam2.
+    //only valid for visible at camera box.
+    Eigen::Matrix<double, 3, 3> K;
+    K<<7.215377e+02, 0.000000e+00, 6.095593e+02, 
+        0.000000e+00, 7.215377e+02, 1.728540e+02, 
+        0.000000e+00, 0.000000e+00, 1.000000e+00;
+    Eigen::Matrix<double, 3, 8> icorners3d_cam;
+    Eigen::Matrix<double, 3, 8> jcorners3d_cam;
+    if (coordinate == "velodyne") {
+
+        Eigen::Matrix<double, 4, 4> T_cam_velo = get_T_cam0_velo();
+        bool visible_at_cam = transformVeloToCam3D(*this, T_cam_velo, icorners3d_cam);
+        if (!visible_at_cam) 
+            return 0.0;
+        visible_at_cam = transformVeloToCam3D(j, T_cam_velo, jcorners3d_cam);
+        if (!visible_at_cam) 
+            return 0.0;
+    }
+   
+    Box2D ibox2d = projectToImage(icorners3d_cam, K);
+    Box2D jbox2d = projectToImage(jcorners3d_cam, K);
+    return ibox2d.iou(jbox2d);
 }
 
 double Box2D::iou(const Box2D & j) const

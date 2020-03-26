@@ -78,7 +78,6 @@ int main(int argc, char** argv)
     std::string calib_path = calib_folder + "calib_velo_to_cam.txt";
 
     Eigen::Matrix<double, 4, 4> Tr_cam0_velo = loadCalibrationRigid(calib_path);
-
     Eigen::Matrix<double, 4, 4> R_rect_00 = loadCalibrationCamera("R_rect_00");
     Eigen::Matrix<double, 3, 4> P_rect_02 = loadCalibrationCamera("P_rect_02");
     Eigen::Matrix<double, 4, 4> T2 = Eigen::MatrixXd::Identity(4, 4);

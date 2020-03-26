@@ -27,7 +27,7 @@
 #include "kitti/box_utils.h"
 
 //default is velodyne coordinate.
-typedef kitti::Box3D DetectedBox;
+//typedef kitti::Box3D DetectedBox;
 
 using std::atan2;
 using std::cos;
@@ -45,6 +45,7 @@ jsk_recognition_msgs::BoundingBoxArrayPtr boxesCurr(new jsk_recognition_msgs::Bo
 pcl::PointCloud<PointType>::Ptr laserCloudIn(new pcl::PointCloud<PointType>());
 
 
+//world is the first lidar frame pose.
 //lidar pose
 Eigen::Quaterniond q_w_lidar(1, 0, 0, 0);
 Eigen::Vector3d t_w_lidar(0, 0, 0);
@@ -59,6 +60,34 @@ bool use_gt_objects;
 
 
 
+void transforomToWorldCoord(std::vector<DetectedBox> & boxes)
+{
+    for (size_t i = 0; i < boxes.size(); ++i)
+    {
+        //ROS_INFO_STREAM("before transform box: "  << i << ": " << boxes[i].getPrintString());
+        Eigen::Vector3d p_lidar(boxes[i].x, boxes[i].y, boxes[i].z);
+        Eigen::Vector3d p_world = q_w_lidar * p_lidar + t_w_lidar;
+        boxes[i].x = p_world.x();
+        boxes[i].y = p_world.y();
+        boxes[i].z = p_world.z();
+        
+        //ROS_INFO_STREAM("after transform to world, box: "  << i << ": " << boxes[i].getPrintString());
+    }
+}
+void transforomToLidarCoord(std::vector<DetectedBox> & boxes)
+{
+    for (size_t i = 0; i < boxes.size(); ++i)
+    {
+        //ROS_INFO_STREAM("before transform box: "  << i << ": " << boxes[i].getPrintString());
+        Eigen::Vector3d p_world(boxes[i].x, boxes[i].y, boxes[i].z);
+        Eigen::Vector3d p_lidar = q_w_lidar.inverse() * p_world - q_w_lidar.inverse() * t_w_lidar;
+        boxes[i].x = p_lidar.x();
+        boxes[i].y = p_lidar.y();
+        boxes[i].z = p_lidar.z();
+        
+        //ROS_INFO_STREAM("after transform to lidar, box: "  << i << ": " << boxes[i].getPrintString());
+    }
+}
 
 void BBoxArrayMsgToBoxes(jsk_recognition_msgs::BoundingBoxArrayConstPtr boxes_msg, bool has_label, std::vector<DetectedBox> & boxes)
 {
@@ -159,7 +188,10 @@ int main(int argc, char **argv)
     ros::Subscriber subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("/odometry_gt", 100, laserOdometryHandler);
 
 
-    ros::Publisher pubTracks = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/tracks", 100);
+    ros::Publisher pubTracksatWorld = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/tracks_world", 100);
+
+    //to convert tracking result to Kitti Format then evaluate tracking performance.
+    ros::Publisher pubTracksatLidar = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/tracks_lidar", 100);
    
     
    
@@ -207,17 +239,40 @@ int main(int argc, char **argv)
             TicToc t_whole;
             //Filter pointcloud using crop box. dimension limit by diagonal line of box.
 
+            ROS_INFO_STREAM("dealing with frame: " <<tracker.frame_idx_);
             std::vector<DetectedBox> detections;
             BBoxArrayMsgToBoxes(boxesCurr, use_gt_objects, detections);
+            //transform to world coordinate?
+            for (size_t i = 0; i < detections.size(); ++i)
+            {
+                ROS_INFO_STREAM("before transform box: "  << i << ": " << detections[i].getPrintString());
+                Eigen::Quaterniond q_lidar_obj = euler_to_quaternion(Eigen::Vector3d(0.0, 0.0, detections[i].yaw));
+                Eigen::Quaterniond q_w_obj = q_w_lidar * q_lidar_obj;
+                double yaw_world = quaternion_to_euler(q_w_obj).z();
+                Eigen::Vector3d p_lidar(detections[i].x, detections[i].y, detections[i].z);
+                Eigen::Vector3d p_world = q_w_lidar * p_lidar + t_w_lidar;
+                detections[i].x = p_world.x();
+                detections[i].y = p_world.y();
+                detections[i].z = p_world.z();
+                detections[i].yaw = yaw_world;
+                ROS_INFO_STREAM("after transform to world, box: "  << i << ": " << detections[i].getPrintString());
+            }
+            
+
             if (use_gt_objects)
                 tracker.UpdateGT(detections);
             else
                 tracker.Update(detections);
 
             
-            jsk_recognition_msgs::BoundingBoxArray tracks_msg;
-            tracks_msg.header.frame_id = "/camera_init";
-            tracks_msg.header.stamp = ros::Time().fromSec(timeObjectArray);
+            jsk_recognition_msgs::BoundingBoxArray tracks_world_msg;
+            jsk_recognition_msgs::BoundingBoxArray tracks_lidar_msg;
+            tracks_world_msg.header.frame_id = "/camera_init";
+            tracks_world_msg.header.stamp = ros::Time().fromSec(timeObjectArray);
+
+            tracks_lidar_msg.header.frame_id = "/current_lidar";
+            //tracks_lidar_msg.header.frame_id = "/camera_init";
+            tracks_lidar_msg.header.stamp = ros::Time().fromSec(timeObjectArray);
                 
             //publish
             std::map<int, DetectedBox> objects = tracker.GetCurrentObjects();
@@ -231,23 +286,42 @@ int main(int argc, char **argv)
                     continue;
                 }
                 //publish current tracks(current tracked boxes), relative to current sensor frame.
+                //ROS_INFO_STREAM("before transform box: "  << i << ": " << box.getPrintString());
+                Eigen::Vector3d p_world(box.x, box.y, box.z);
+                Eigen::Vector3d p_lidar = q_w_lidar * p_lidar + t_w_lidar;
+                Eigen::Quaterniond q_w_obj = euler_to_quaternion(Eigen::Vector3d(0.0, 0.0, box.yaw));
+                Eigen::Quaterniond q_lidar_obj = q_w_lidar.inverse() * q_w_obj; 
+                double yaw_lidar = quaternion_to_euler(q_lidar_obj).z();
+                DetectedBox box_lidar(p_lidar.x(), p_lidar.y(), p_lidar.z(), box.l, box.w, box.h, yaw_lidar);
+                jsk_recognition_msgs::BoundingBox bbox_lidar_msg;
+                BoxToBBoxMsg(box_lidar, bbox_lidar_msg);
+                bbox_lidar_msg.label = id;
+                bbox_lidar_msg.header.stamp = tracks_lidar_msg.header.stamp;
+                bbox_lidar_msg.header.frame_id = tracks_lidar_msg.header.frame_id;
+                tracks_lidar_msg.boxes.push_back(bbox_lidar_msg);
+                //ROS_INFO_STREAM("before transform box: "  << i << ": " << box_lidar.getPrintString());
+
+                //publish current tracks(current tracked boxes), relative to world frame.
                 jsk_recognition_msgs::BoundingBox bbox_msg;
                 BoxToBBoxMsg(box, bbox_msg);
                 bbox_msg.label = id;
-                bbox_msg.header.stamp = tracks_msg.header.stamp;
-                bbox_msg.header.frame_id = tracks_msg.header.frame_id;
-                tracks_msg.boxes.push_back(bbox_msg);
+                bbox_msg.header.stamp = tracks_world_msg.header.stamp;
+                bbox_msg.header.frame_id = tracks_world_msg.header.frame_id;
+                tracks_world_msg.boxes.push_back(bbox_msg);
                 ROS_INFO_STREAM("[test_tracking]publish tracks_msg, id: " << id << ", at frame: " << tracker.frame_idx_);
 
                 //publish each object' odom and path, relative to global frame..
-
-                Eigen::Vector3d t_lidar_obj(box.x, box.y, box.z);
                 //w,x,y,z
                 Eigen::Vector3d euler(0.0, 0.0, box.yaw);
+                /*
+                Eigen::Vector3d t_lidar_obj(box.x, box.y, box.z);
                 Eigen::Quaterniond q_lidar_obj = euler_to_quaternion(euler);
                 Eigen::Quaterniond q_w_obj = q_w_lidar * q_lidar_obj;
                 Eigen::Vector3d t_w_obj = q_w_lidar * t_lidar_obj + t_w_lidar;
+                */
 
+                Eigen::Vector3d t_w_obj(box.x, box.y, box.z);
+                //Eigen::Quaterniond q_w_obj = euler_to_quaternion(euler);
                 //publish odometry
                 if (pubObjectsOdomDict.find(id) == pubObjectsOdomDict.end())
                 {
@@ -289,7 +363,8 @@ int main(int argc, char **argv)
                 pubObjectsPathDict[id].publish(objects_path_msg[id]);        
                 
             }
-            pubTracks.publish(tracks_msg);
+            pubTracksatWorld.publish(tracks_world_msg);
+            pubTracksatLidar.publish(tracks_lidar_msg);
 
         
         }
